@@ -1,140 +1,143 @@
 """
 
-Many models taken from https://github.com/hichamjanati/PHD-filter
-TODO: change to update using this https://github.com/danstowell/gmphd/blob/master/gmphd.py ???
+Many models taken from https://github.com/rafaelkarrer/python-particle-phd-filter
 
 """
 
 import numpy as np
-from scipy.stats import mvn
-
-
-def pseudo_det(X):
-    eig = np.linalg.eig(X)[0]
-    return np.prod(eig[eig > 0])
-
-
-"""
-Birth and Survival are models used for target generation and "un-generation"
-"""
+from scipy.stats import multivariate_normal as mv_normal
+from scipy.stats import uniform
 
 
 class Birth:
-    def __init__(self, poisson_coef, poisson_mean, poisson_cov, poisson_window):
-        self.poisson_coef = poisson_coef
-        self.poisson_mean = poisson_mean
-        self.poisson_cov = poisson_cov
-        self.poisson_window = poisson_window
+    def __init__(self,
+                 poisson_lambda,
+                 region=[(-100, 100), (-100, 100)]):
+        self.poisson_lambda = poisson_lambda
+        self.region = region
 
     """
-    return number of newborn targets and positions
+    returns position of newborn targets
     """
-    def birth(self):
-        # cdf of multivariate gaussian over window [wmin;wmax]
-        mu, i = mvn.mvnun(self.poisson_window[0], self.poisson_window[1],
-                          self.poisson_mean, self.poisson_cov)
-        mu *= self.poisson_coef
-
+    def Sample(self):
         # number of newborn targets
-        N = np.random.poisson(mu)
+        N = np.random.poisson(self.poisson_lambda)
 
-        # generate position of N new targets within the window
+        # generate position of N new targets within the region
         positions = []
-        for k in range(0, N):
-            x_k = np.random.multivariate_normal(mean=self.poisson_mean,
-                                                cov=self.poisson_cov)
-            while (min(x_k > self.poisson_window[0]) == False) or \
-                    (min(self.poisson_window[1] > x_k) == False):
-                x_k = np.random.multivariate_normal(mean=self.poisson_mean,
-                                                    cov=self.poisson_cov)
-            positions.append(x_k)
 
-        # return number of newborn targets and positions
+        for k in range(0, N):
+            x_center = (self.region[0][1] - self.region[0][0]) + \
+                       self.region[0][0]
+            y_center = (self.region[1][1] - self.region[1][0]) + \
+                       self.region[1][0]
+            x = np.random.poisson(x_center) + self.region[0][0]
+            y = np.random.poisson(y_center) + self.region[1][0]
+            positions.append(np.array([[x], [y], [0.], [0.]]))
+
+        # return newborn targets and positions
         return N, positions
 
 
+class Transition:
+    def __init__(self, process_noise=0.1, step=1):
+        self.A = np.array(
+            [[1, 0, 1, 0], [0, 1, 0, 1], [0, 0, 1, 0], [0, 0, 0, 1]])
+        # self.Q = var_v * np.array([[1.0 / 3, 0, 1.0 / 2, 0],
+        #                             [0, 1.0 / 3, 0, 1.0 / 2],
+        #                             [1.0 / 2, 0, 1, 0],
+        #                             [0, 1.0 / 2, 0, 1]])
+        # self.rv = mv_normal(np.array([0, 0, 0, 0]), self.Q)
+        self.Q = np.eye(self.A.shape[0]) * process_noise ** 2
+        self.B = np.eye(self.A.shape[0])
+        self.U = np.zeros((self.A.shape[0], 1)) + step
+
+    def AdvanceState(self, x):
+        # v = np.array(self.rv.rvs(1)).T
+        # return self.A * x + v
+        next_state = np.dot(self.A, x) + np.dot(self.B, self.U)
+        next_state[0, 0] = next_state[0, 0] + np.random.randn() * self.Q[0, 0]
+        next_state[1, 0] = next_state[1, 0] + np.random.randn() * self.Q[1, 1]
+        return next_state
+
+
 class Survival:
-    def __init__(self, survival_prob):
-        self.survival_prob = survival_prob
+    # Default probability is 0.9.
+    # otherwise should depend on the region ?
+    def __init__(self, survival_probability=0.9):
+        self.survival_probability = survival_probability
 
-    """
-    return number of dead targets and their index
-    """
-    def survive(self, num_targets):
-        survival = np.random.uniform(size=num_targets)
-        deads = [i for i in num_targets if survival[i] >= self.survival_prob]
-        return len(deads), deads
-
-
-class TargetMotion:
-    def __init__(self, X, cov):
-        self.X = X
-        self.cov = cov
-
-    def next(self, xk_1):
-        x = np.asarray(xk_1).reshape(-1)
-        # Returns next true positions and velocities given previous ones (xk_1)
-        return np.random.multivariate_normal(mean=np.dot(self.X, x),
-                                             cov=self.cov)
-
-    def next_pdf(self, xk_1, xk):
-        xk = np.asarray(xk).reshape(-1)
-        # Returns pdf of next true pos and velocities given xk_1) ?
-        mean = np.dot(self.X, xk)
-
-        sqrt_pseudo_det = pseudo_det(self.cov) ** 0.5
-        inv_cov = np.linalg.pinv(self.cov)
-
-        pdf = 1 / (2 * np.pi * sqrt_pseudo_det) * \
-            np.exp(-0.5 * (xk_1 - mean).dot(inv_cov.dot((xk_1 - mean).T)))
-
-        return pdf
-
-
-# TODO: change this
-class TargetQ:
-    def __init__(self, X, cov):
-        self.X = X
-        self.cov = cov
-
-    def next(self, xk_1):
-        x = np.asarray(xk_1).reshape(-1)
-        # Returns next true positions and velocities given previous ones (xk_1)
-        return np.random.multivariate_normal(mean=np.dot(self.X, x),
-                                             cov=self.cov)
-
-    def next_pdf(self, xk_1, xk):
-        xk = np.asarray(xk).reshape(-1)
-        # Returns pdf of next true pos and velocities given xk_1) ?
-        mean = np.dot(self.X, xk)
-
-        sqrt_pseudo_det = pseudo_det(self.cov) ** 0.5
-        inv_cov = np.linalg.pinv(self.cov)
-
-        pdf = 1 / (2 * np.pi * sqrt_pseudo_det) * \
-            np.exp(-0.5 * (xk_1 - mean).dot(inv_cov.dot((xk_1 - mean).T)))
-
-        return pdf
+    def Evolute(self, weights):
+        # uniform survival, position of particles is not considered
+        return weights * self.survival_probability
 
 
 class Measurement:
-    def __init__(self, H, noise):
-        self.H = H
-        self.noise = noise
+    def __init__(self,
+                 measurement_variance,
+                 detection_probability,
+                 region=[(-100, 100), (-100, 100)]):
+        self.measurement_variance = measurement_variance
+        self.detection_probability = detection_probability
+        self.C = np.eye(len(region)) * self.measurement_variance
+        self.likelihood_func = mv_normal(np.zeros(len(region)),
+                                         self.C)
+        self.detection_func = uniform()
+        self.region = region
 
-    def next(self, xk):
-        xk = np.asarray(xk).reshape(-1)
-        # Return observed position given true position x
-        return np.random.multivariate_normal(mean=np.dot(self.H, xk),
-                                             cov=self.noise)
+    def Sample(self, n):
+        return self.likelihood_func.rvs(n)
 
-    def next_pdf(self, yk, xk):
-        mean = np.dot(self.H, xk)
+    def Likelihood(self, measurement):
+        return self.likelihood_func.pdf(measurement)
 
-        sqrt_det_g = np.linalg.det(self.noise) ** 0.5
-        obs_inv = np.linalg.inv(self.noise)
+    def DetectionProbability(self, target):
+        x = target[0]
+        y = target[1]
+        if x < self.region[0][0] or x > self.region[0][1] \
+                or y < self.region[1][0] or y > self.region[1][1]:
+            return 0
+        else:
+            return self.detection_probability
 
-        pdf = 1 / (2 * np.pi * sqrt_det_g) * \
-              np.exp(-0.5*(yk - mean).dot(obs_inv.dot((yk - mean).T)))
+    def CalcWeight(self, measurement, target):
+        return self.Likelihood(measurement) * self.DetectionProbability(target)
 
-        return pdf
+    def Measure(self, target):
+        sample = self.Sample(target.shape[1] * 2).T
+        n = sample.reshape(4, target.shape[1])
+        z = target + n
+        det = np.where(self.detection_func.rvs(target.shape[1]) <=
+                       self.detection_probability)[0]
+        z[2:4, :] = 0
+        return z[:, det]
+
+
+class Clutter:
+    def __init__(self,
+                 poisson_lambda,
+                 region=[(-100, 100), (-100, 100)]):
+        self.poisson_lambda = poisson_lambda
+        self.region = region
+
+    def Sample(self):
+        if self.poisson_lambda == 0:
+            return 0, []
+
+        # amount of clutter
+        N = np.random.poisson(self.poisson_lambda)
+
+        # generate position of N clutter within the region
+        positions = []
+
+        for k in range(0, N):
+            x_center = (self.region[0][1] - self.region[0][0]) + \
+                       self.region[0][0]
+            y_center = (self.region[1][1] - self.region[1][0]) + \
+                       self.region[1][0]
+            x = np.random.poisson(x_center) + self.region[0][0]
+            y = np.random.poisson(y_center) + self.region[1][0]
+            positions.append(np.array([x, y]))
+
+        # return clutter count and positions
+        return N, positions

@@ -1,56 +1,60 @@
-from models import *
+from models import Birth, Clutter, Measurement, Transition
+
 
 class PHDGenerator:
     def __init__(self,
-                 timesteps,
                  birth_model,
-                 motion_model,
-                 observation_model,
                  clutter_model,
+                 transition_model,
+                 measurement_model,
+                 timesteps=200,
+                 init_targets=[],
                  region=[(-100, 100), (-100, 100)]):
 
-        self.timesteps = timesteps
         self.birth_model = birth_model
-        self.motion_model = motion_model
         self.clutter_model = clutter_model
-        self.observation_model = observation_model
+        self.transition_model = transition_model
+        self.measurement_model = measurement_model
+        self.timesteps = timesteps
         self.region = region
 
-        self.surviving_targets = []  # true survivors from last timestep
+        self.last_timestep_targets = init_targets
         self.true_targets = {}  # for true observations
         self.observations = {}  # for true observations and clutter
 
     def generate(self, k):
         new_observations = []
-        next_survivors = []
+        next_timestep_targets = []
 
-        # Next timestep Survivors (existing targets that DO NOT leave region)
-        for i in self.surviving_targets:
+        # Next timestep targets
+        for i in range(0, len(self.last_timestep_targets)):
+            t = self.last_timestep_targets[i]
             # Apply Transition Model
-            new_pos = self.motion_model.next(self.surviving_targets[i])
-            x = new_pos[i][0]
-            y = new_pos[i][1]
+            new_pos = self.transition_model.AdvanceState(t)
+            new_meas = self.measurement_model.Measure(t)
 
-            if x < self.region[0][0] or x > self.region[0][1] \
-                    or y < self.region[1][0] or y > self.region[1][1]:
-                continue
-            next_survivors.append(new_pos)
-
-            # Apply Observation Model
-            new_observations.append(self.observation_model.next(new_pos))
+            next_timestep_targets.append(new_pos)
+            new_observations.append(new_meas)
 
         # Generate New Births
-        num_new, new = self.birth_model.birth()
+        num_births, birth_pos = self.birth_model.Sample()
 
         # Add New Births and their observations to next survivors
-        for i in new:
-            next_survivors.append(new)
-            new_observations.append(self.observation_model.next(i))
+        for i in range(0, num_births):
+            t = birth_pos[i]
+            next_timestep_targets.append(t)
+            birth_meas = self.measurement_model.Measure(t)
+            new_observations.append(birth_meas)
 
         # Generate Clutter and add to observations
+        num_clutter, clutter_pos = self.clutter_model.Sample()
+
+        for i in clutter_pos:
+            new_observations.append(i)
 
         # Update Observations and Targets
-        self.true_targets[k] = next_survivors
+        self.true_targets[k] = next_timestep_targets
         self.observations[k] = new_observations
+        self.last_timestep_targets = next_timestep_targets
 
 
