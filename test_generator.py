@@ -1,7 +1,6 @@
 from unittest import TestCase
 
 import numpy as np
-from numpy.testing import assert_array_equal, assert_raises
 
 from models import Birth, Clutter, Transition, Measurement
 from PHDGenerator import PHDGenerator
@@ -31,15 +30,28 @@ class GeneratorTests(TestCase):
     def tearDown(self):
         super().tearDown()
 
-    def test_generate(self):
-        print(self.generator.last_timestep_targets)
-        self.generator.generate(0)
-
-        print(self.generator.true_targets)
-        print(self.generator.observations)
+    def test_iterate(self):
+        self.generator.iterate(0)
 
         assert len(self.generator.true_targets.keys()) == 1
         assert len(self.generator.true_targets[0]) == \
                len(self.generator.last_timestep_targets)
-        assert len(self.generator.true_targets[0]) <= \
+        assert len(self.generator.true_targets[0]) == \
+               len(self.generator.true_observations[0])
+        assert (len(self.generator.true_observations[0]) +
+                len(self.generator.clutter_observations[0])) == \
                len(self.generator.observations[0])
+
+    def test_generate(self):
+        self.generator.generate(10)
+
+        assert len(self.generator.observations.keys()) == 10
+        assert len(self.generator.true_targets.keys()) == 10
+
+        self.generator.plot_gif(show_clutter=True)
+
+    def test_reset(self):
+        self.generator.generate(10)
+        self.generator.reset()
+        assert len(self.generator.observations.keys()) == 0
+        assert len(self.generator.true_targets.keys()) == 0

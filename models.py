@@ -130,6 +130,7 @@ class Clutter:
         # generate position of N clutter within the region
         positions = []
 
+        # TODO: Change to Uniform placement
         for k in range(0, N):
             x_center = (self.region[0][1] - self.region[0][0]) + \
                        self.region[0][0]
