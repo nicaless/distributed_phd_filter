@@ -1,4 +1,6 @@
 import numpy as np
+from models import Resample
+
 
 class PHDFilter:
     def __init__(self,
@@ -7,6 +9,7 @@ class PHDFilter:
                  measurement_model,
                  transition_model,
                  survival_model,
+                 estimation_model,
                  init_targets=[],
                  init_weights=[],
                  J=10
@@ -16,22 +19,34 @@ class PHDFilter:
         self.measurement_model = measurement_model
         self.transition_model = transition_model
         self.survival_model = survival_model
+        self.estimation_model = estimation_model
         self.J = J
 
         # set of tracked positions of all targets
+        # TODO: change naming to 'particles' instead of targets
         self.targets = {}
         self.current_targets = init_targets
+        self.num_current_targets = len(self.current_targets)
 
-        # set of phds of all targets ?
+        # set of weights of all targets
         self.weights = {}
         self.current_weights = init_weights
 
         # prediction results
         self.predicted_pos = []
         self.predicted_weights = []
+        self.predicted_num_targets = len(self.predicted_pos)
 
         # update results
         self.updated_weights = []
+
+        # resample results
+        self.resampled_pos = []
+        self.resampled_weights = []
+        self.resampled_num_targets = len(self.resampled_pos)
+
+        # target centroids
+        self.centroids = []
 
     def predict(self):
         # Get New Positions for Existing Targets
@@ -56,6 +71,7 @@ class PHDFilter:
 
         self.predicted_pos = new_positions
         self.predicted_weights = new_weights
+        self.predicted_num_targets = len(self.predicted_pos)
 
     def update(self, measurements):
         # Get the Weight Update
@@ -84,13 +100,30 @@ class PHDFilter:
                       weight_update
 
         self.updated_weights = new_weights
+        # print(self.updated_weights)
+        # print(np.sum(self.updated_weights))
 
-    # not entirely sure what this step is for?
     def resample(self):
-        pass
+        particle_mass = np.sum(self.updated_weights)
+        true_target_indices = Resample(np.array(self.updated_weights) / particle_mass)
+        true_particles = [self.predicted_pos[i] for i in true_target_indices]
+        true_weights = [self.updated_weights[i] for i in true_target_indices]
 
-    # not entirely sure what this step is for?
+        self.resampled_pos = true_particles
+        self.resampled_weights = true_weights
+        self.resampled_num_targets = len(self.resampled_pos)
+
     def estimate(self):
-        pass
+        particle_positions_matrix = np.zeros((len(self.resampled_pos), 2))
+        for p in range(len(self.resampled_pos)):
+            particle_positions_matrix[p][0] = self.resampled_pos[p][0]
+            particle_positions_matrix[p][1] = self.resampled_pos[p][1]
+        estimated_total_targets = int(np.ceil(np.sum(self.resampled_weights)))
+        centroids = self.estimation_model.estimate(particle_positions_matrix,
+                                                   estimated_total_targets)
+        self.centroids = centroids
+
+
+
 
 

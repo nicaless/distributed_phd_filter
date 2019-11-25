@@ -3,7 +3,7 @@ from unittest import TestCase
 import numpy as np
 from numpy.testing import assert_array_equal, assert_raises
 
-from models import Birth, Measurement, Transition
+from models import Birth, Measurement, Transition, Resample
 
 # np.random.seed(4)
 
@@ -31,7 +31,8 @@ class ModelTests(TestCase):
         weights = self.birth_model.Weight(N)
 
         assert N == len(weights)
-        assert weights[0] == 1.0 / N
+        if N > 0:
+            assert weights[0] == 1.0 / N
 
     def test_transition(self):
         current_state = np.array([[0.], [0.], [0.], [0.]])
@@ -48,6 +49,16 @@ class ModelTests(TestCase):
             probs.append(self.measurement_model.DetectionProbability(t))
 
         assert probs == [0, .98]
+
+    def test_resample(self):
+        weights = [.2, .2, .2, .00001]
+        particle_mass = np.sum(weights)
+        indices = Resample(np.array(weights) / particle_mass)
+
+        assert len(indices) <= len(weights)
+
+
+
 
 
 

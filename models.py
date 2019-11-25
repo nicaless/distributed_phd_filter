@@ -5,8 +5,11 @@ Many models taken from https://github.com/rafaelkarrer/python-particle-phd-filte
 """
 
 import numpy as np
+import random
+import scipy.cluster.vq as vq
 from scipy.stats import multivariate_normal as mv_normal
 from scipy.stats import uniform
+
 
 
 class Birth:
@@ -166,5 +169,40 @@ class Clutter:
         #            self.region[0][0]
         # y_center = (self.region[1][1] - self.region[1][0]) + \
         #            self.region[1][0]
+
+
+class Estimate:
+    def __init__(self, mu):
+        self.mu = mu
+
+    # TODO: using KMeans for now... change to Lloyd's?
+    @staticmethod
+    def estimate(particles, estimated_number_targets):
+        x = vq.whiten(particles)
+        x_est, idx = vq.kmeans2(x, estimated_number_targets)
+        return x_est
+
+
+# Copied form here:
+# https://filterpy.readthedocs.io/en/latest/_modules/filterpy/monte_carlo/resampling.html#systematic_resample
+def Resample(weights):
+    N = weights.size
+
+    cum_sum_weights = np.cumsum(weights)
+
+    random_positions = (np.random.random() + np.arange(N)) / N
+
+    indexes = np.zeros(N, 'i')
+
+    i, j = 0, 0
+    while i < N:
+        if random_positions[i] < cum_sum_weights[j]:
+            indexes[i] = j
+            i += 1
+        else:
+            j += 1
+
+    return np.unique(indexes)
+
 
 
