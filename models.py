@@ -19,9 +19,12 @@ class Birth:
     """
     returns position of newborn targets
     """
-    def Sample(self):
-        # number of newborn targets
-        N = np.random.poisson(self.poisson_lambda)
+    def Sample(self, max_N=None):
+        if max_N is not None:
+            N = max_N
+        else:
+            # number of newborn targets
+            N = np.random.poisson(self.poisson_lambda)
 
         # generate position of N new targets within the region
         positions = []
@@ -37,6 +40,10 @@ class Birth:
 
         # return newborn targets and positions
         return N, positions
+
+    # TODO: uniform weight. not sure if need to should change this
+    def Weight(self, N):
+        return [float(self.poisson_lambda) / N for i in range(0, N)]
 
 
 class Transition:
@@ -101,7 +108,10 @@ class Measurement:
             return self.detection_probability
 
     def CalcWeight(self, measurement, target):
-        return self.Likelihood(measurement) * self.DetectionProbability(target)
+        # print("m: {m}".format(m=measurement))
+        # print("t: {t}".format(t=target))
+        return self.Likelihood((measurement[0:2,:] - target[0:2,:]).T) * \
+               self.DetectionProbability(target)
 
     def Measure(self, target):
         sample = self.Sample(target.shape[1] * 2).T
@@ -138,7 +148,23 @@ class Clutter:
                        self.region[1][0]
             x = np.random.poisson(x_center) + self.region[0][0]
             y = np.random.poisson(y_center) + self.region[1][0]
-            positions.append(np.array([x, y]))
+            # positions.append(np.array([x, y]))
+            positions.append(np.array([[x], [y], [0.], [0.]]))
 
         # return clutter count and positions
         return N, positions
+
+    def Likelihood(self):
+        # likelihood_func = mv_normal(np.zeros(len(self.region)),
+        #                             self.poisson_lambda)
+        # return likelihood_func.pdf(measurement)
+        region_area = (self.region[0][1] - self.region[0][0]) * \
+                      (self.region[1][1] - self.region[1][0])
+        return float(self.poisson_lambda) / region_area
+
+        # x_center = (self.region[0][1] - self.region[0][0]) + \
+        #            self.region[0][0]
+        # y_center = (self.region[1][1] - self.region[1][0]) + \
+        #            self.region[1][0]
+
+

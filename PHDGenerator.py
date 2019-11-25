@@ -1,5 +1,4 @@
 import matplotlib.pyplot as plt
-import matplotlib.animation as animation
 
 
 class PHDGenerator:
@@ -141,7 +140,6 @@ class PHDGenerator:
             y_clutter = []
             for i, clutter in self.clutter_observations.items():
                 for c in clutter:
-                    print(c)
                     x_clutter.append(c[0])
                     y_clutter.append(c[1])
             plt.scatter(x_clutter, y_clutter, label='clutter')

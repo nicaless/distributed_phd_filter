@@ -2,7 +2,7 @@ from unittest import TestCase
 
 import numpy as np
 
-from models import Birth, Clutter, Transition, Measurement
+from models import Birth, Clutter, Measurement, Survival, Transition
 from PHDGenerator import PHDGenerator
 
 

@@ -3,7 +3,7 @@ from unittest import TestCase
 import numpy as np
 from numpy.testing import assert_array_equal, assert_raises
 
-from models import Birth, Transition, Measurement
+from models import Birth, Measurement, Transition
 
 # np.random.seed(4)
 
@@ -25,6 +25,13 @@ class ModelTests(TestCase):
 
         assert N >= 0
         assert len(positions) == N
+
+    def test_birth_weight(self):
+        N, positions = self.birth_model.Sample()
+        weights = self.birth_model.Weight(N)
+
+        assert N == len(weights)
+        assert weights[0] == 1.0 / N
 
     def test_transition(self):
         current_state = np.array([[0.], [0.], [0.], [0.]])
