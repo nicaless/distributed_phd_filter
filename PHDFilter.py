@@ -1,4 +1,5 @@
 import numpy as np
+import matplotlib.pyplot as plt
 from models import Resample
 
 
@@ -47,6 +48,7 @@ class PHDFilter:
 
         # target centroids
         self.centroids = []
+        self.centroid_movement = {}
 
     def predict(self):
         # Get New Positions for Existing Targets
@@ -122,6 +124,79 @@ class PHDFilter:
         centroids = self.estimation_model.estimate(particle_positions_matrix,
                                                    estimated_total_targets)
         self.centroids = centroids
+
+    def plot(self, k):
+        # plot all 4 steps
+
+        # plot predicted new positions of particles
+        plt.xlim([-100, 100])
+        plt.ylim([-100, 100])
+
+        x = []
+        y = []
+        for t in self.predicted_pos:
+            x.append(t[0][0])
+            y.append(t[1][0])
+        plt.scatter(x, y, label='prediction')
+
+        # plot resampled positions
+        x = []
+        y = []
+        for t in self.resampled_pos:
+            x.append(t[0][0])
+            y.append(t[1][0])
+        plt.scatter(x, y, label='resample')
+
+        # plot centroid
+        x = []
+        y = []
+        for t in self.centroids:
+            x.append(t[0])
+            y.append(t[1])
+        plt.scatter(x, y, label='centroid', color='black')
+
+        plt.legend()
+        plt.savefig('results/{k}.png'.format(k=k))
+        plt.clf()
+
+    # TODO: add a reset
+    def step_through(self, measurements):
+        for i, m in measurements.items():
+            self.predict()
+            self.update(m)
+            self.resample()
+            self.estimate()
+            self.plot(i)
+
+            self.targets[i] = self.resampled_pos
+            self.current_targets = self.resampled_pos
+            self.num_current_targets = len(self.current_targets)
+            self.weights[i] = self.resampled_weights
+            self.current_weights = self.resampled_weights
+            self.centroid_movement[i] = self.centroids
+
+    def plot_centroids(self):
+        targets = {}
+        for i, cs in self.centroid_movement.items():
+            for j, c in enumerate(cs):
+                if j not in targets.keys():
+                    targets[j] = [c]
+                else:
+                    targets[j].append(c)
+
+        for t, pos in targets.items():
+            x = []
+            y = []
+            for p in pos:
+                x.append(p[0])
+                y.append(p[1])
+            plt.plot(x, y, label=t)
+
+        plt.legend()
+        plt.savefig('centroids.png')
+
+
+
 
 
 

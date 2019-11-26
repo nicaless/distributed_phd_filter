@@ -86,7 +86,7 @@ class PHDGenerator:
         self.true_targets = {}
         self.observations = {}
 
-    def plot_iter(self, k, show_clutter=False):
+    def plot_iter(self, k, folder='data', show_clutter=False):
         plt.xlim([-100, 100])
         plt.ylim([-100, 100])
 
@@ -114,7 +114,7 @@ class PHDGenerator:
             plt.scatter(x_clutter, y_clutter, label='clutter')
 
         plt.legend()
-        plt.savefig('test/{k}.png'.format(k=k))
+        plt.savefig('{folder}/{k}.png'.format(folder=folder, k=k))
         plt.clf()
 
     def plot(self, show_clutter=False):
@@ -147,9 +147,12 @@ class PHDGenerator:
         plt.legend()
         plt.savefig('test1.png')
 
-    def plot_gif(self, show_clutter=False):
+    def plot_gif(self, folder='data', show_clutter=False):
         for k in range(0, self.current_step+1):
-            self.plot_iter(k, show_clutter=show_clutter)
+            self.plot_iter(k, folder=folder, show_clutter=show_clutter)
+
+    def save_data(self):
+        pass
 
 
 

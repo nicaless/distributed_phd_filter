@@ -11,7 +11,6 @@ from scipy.stats import multivariate_normal as mv_normal
 from scipy.stats import uniform
 
 
-
 class Birth:
     def __init__(self,
                  poisson_lambda,
@@ -50,7 +49,7 @@ class Birth:
 
 
 class Transition:
-    def __init__(self, process_noise=0.1, step=1):
+    def __init__(self, process_noise=0.1, step=3):
         self.A = np.array(
             [[1, 0, 1, 0], [0, 1, 0, 1], [0, 0, 1, 0], [0, 0, 0, 1]])
         # self.Q = var_v * np.array([[1.0 / 3, 0, 1.0 / 2, 0],
@@ -143,15 +142,17 @@ class Clutter:
         # generate position of N clutter within the region
         positions = []
 
-        # TODO: Change to Uniform placement
         for k in range(0, N):
-            x_center = (self.region[0][1] - self.region[0][0]) + \
-                       self.region[0][0]
-            y_center = (self.region[1][1] - self.region[1][0]) + \
-                       self.region[1][0]
-            x = np.random.poisson(x_center) + self.region[0][0]
-            y = np.random.poisson(y_center) + self.region[1][0]
-            # positions.append(np.array([x, y]))
+            # x_center = (self.region[0][1] - self.region[0][0]) + \
+            #            self.region[0][0]
+            # y_center = (self.region[1][1] - self.region[1][0]) + \
+            #            self.region[1][0]
+            # x = np.random.poisson(x_center) + self.region[0][0]
+            # y = np.random.poisson(y_center) + self.region[1][0]
+            x = np.random.uniform(low=self.region[0][0],
+                                  high=self.region[0][1])
+            y = np.random.uniform(low=self.region[1][0],
+                                  high=self.region[1][1])
             positions.append(np.array([[x], [y], [0.], [0.]]))
 
         # return clutter count and positions
