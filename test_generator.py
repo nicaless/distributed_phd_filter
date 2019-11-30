@@ -2,7 +2,8 @@ from unittest import TestCase
 
 import numpy as np
 
-from models import Birth, Clutter, Measurement, Survival, Transition
+from models import Birth, Clutter, Measurement, \
+    Survival, Transition, TransitionCircle
 from PHDGenerator import PHDGenerator
 
 
@@ -13,7 +14,8 @@ class GeneratorTests(TestCase):
 
         self.birth_model = Birth(1)
         self.clutter_model = Clutter(1)
-        self.transition_model = Transition()
+        # self.transition_model = Transition()
+        self.transition_model = TransitionCircle()
         self.measurement_model = Measurement(3, .98)
 
         init_targets = [np.array([[0.], [0.], [0.], [0.]]),
@@ -36,8 +38,8 @@ class GeneratorTests(TestCase):
         assert len(self.generator.true_targets.keys()) == 1
         assert len(self.generator.true_targets[0]) == \
                len(self.generator.last_timestep_targets)
-        assert len(self.generator.true_targets[0]) == \
-               len(self.generator.true_observations[0])
+        # assert len(self.generator.true_targets[0]) == \
+        #        len(self.generator.true_observations[0])
         assert (len(self.generator.true_observations[0]) +
                 len(self.generator.clutter_observations[0])) == \
                len(self.generator.observations[0])

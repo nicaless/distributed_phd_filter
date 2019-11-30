@@ -5,7 +5,7 @@ from models import Resample
 
 class PHDFilter:
     def __init__(self,
-                 birth_model,
+                 birth_models,
                  clutter_model,
                  measurement_model,
                  transition_model,
@@ -15,7 +15,9 @@ class PHDFilter:
                  init_weights=[],
                  J=10
                  ):
-        self.birth_model = birth_model
+        # TODO: add region variable
+        # TODO: update birth, clutter, measurement(?) models according to region(s) in view
+        self.birth_models = birth_models
         self.clutter_model = clutter_model
         self.measurement_model = measurement_model
         self.transition_model = transition_model
@@ -64,12 +66,13 @@ class PHDFilter:
 
         # Sample from Birth Model
         # Assign weights to new births
-        num_births, birth_pos = self.birth_model.Sample(max_N=self.J)
-        birth_weights = self.birth_model.Weight(num_births)
+        for birth_model in self.birth_models:
+            num_births, birth_pos = birth_model.Sample(max_N=self.J)
+            birth_weights = birth_model.Weight(num_births)
 
-        # Merge
-        new_positions = new_positions + birth_pos
-        new_weights = new_weights + birth_weights
+            # Merge
+            new_positions = new_positions + birth_pos
+            new_weights = new_weights + birth_weights
 
         self.predicted_pos = new_positions
         self.predicted_weights = new_weights
@@ -121,11 +124,18 @@ class PHDFilter:
             particle_positions_matrix[p][0] = self.resampled_pos[p][0]
             particle_positions_matrix[p][1] = self.resampled_pos[p][1]
         estimated_total_targets = int(np.ceil(np.sum(self.resampled_weights)))
-        centroids = self.estimation_model.estimate(particle_positions_matrix,
-                                                   estimated_total_targets)
-        self.centroids = centroids
 
-    def plot(self, k):
+        # TODO: fix...
+        estimated_total_targets = max(estimated_total_targets,
+                                      len(self.birth_models))
+        if len(self.resampled_pos) == 1:
+            self.centroids = particle_positions_matrix
+        else:
+            centroids = self.estimation_model.estimate(particle_positions_matrix,
+                                                       estimated_total_targets)
+            self.centroids = centroids
+
+    def plot(self, k, folder='results'):
         # plot all 4 steps
 
         # plot predicted new positions of particles
@@ -156,17 +166,17 @@ class PHDFilter:
         plt.scatter(x, y, label='centroid', color='black')
 
         plt.legend()
-        plt.savefig('results/{k}.png'.format(k=k))
+        plt.savefig('{folder}/{k}.png'.format(folder=folder, k=k))
         plt.clf()
 
     # TODO: add a reset
-    def step_through(self, measurements):
+    def step_through(self, measurements, folder='results'):
         for i, m in measurements.items():
             self.predict()
             self.update(m)
             self.resample()
             self.estimate()
-            self.plot(i)
+            self.plot(i, folder=folder)
 
             self.targets[i] = self.resampled_pos
             self.current_targets = self.resampled_pos
