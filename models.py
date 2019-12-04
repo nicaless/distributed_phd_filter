@@ -141,6 +141,9 @@ class Measurement:
         return self.Likelihood((measurement[0:2,:] - target[0:2,:]).T) * \
                self.DetectionProbability(target)
 
+    # TODO: change to usual measurement model, filtered according to detection_function_output < detection_prob
+    # TODO: change detection_function to (kind of) match (15) and (16) page 12 in 2019 Dames paper
+    # TODO: detection_function -> poisson decay from center of SENSOR
     def Measure(self, target):
         sample = self.Sample(target.shape[1] * 2).T
         n = sample.reshape(4, target.shape[1])

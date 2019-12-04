@@ -38,8 +38,10 @@ class GeneratorTests(TestCase):
         assert len(self.generator.true_targets.keys()) == 1
         assert len(self.generator.true_targets[0]) == \
                len(self.generator.last_timestep_targets)
-        # assert len(self.generator.true_targets[0]) == \
-        #        len(self.generator.true_observations[0])
+
+        assert len(self.generator.true_targets[0]) == \
+               (len(self.generator.true_observations[0]) * self.generator.ppt)
+
         assert (len(self.generator.true_observations[0]) +
                 len(self.generator.clutter_observations[0])) == \
                len(self.generator.observations[0])
