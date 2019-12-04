@@ -9,7 +9,8 @@ class PHDGenerator:
                  measurement_model,
                  timesteps=200,
                  init_targets=[],
-                 region=[(-100, 100), (-100, 100)]):
+                 region=[(-100, 100), (-100, 100)],
+                 ppt=1):
 
         self.birth_model = birth_model
         self.clutter_model = clutter_model
@@ -17,6 +18,7 @@ class PHDGenerator:
         self.measurement_model = measurement_model
         self.timesteps = timesteps
         self.region = region
+        self.ppt = ppt
         # TODO: set region for birth model, clutter model, measurement model(?)
 
         self.current_step = 0
@@ -24,9 +26,9 @@ class PHDGenerator:
         self.last_timestep_targets = self.init_targets
         self.true_targets = {}  # true positions
         self.birth_targets = {}  # new births
-        self.true_observations = {}  # for true observations
-        self.clutter_observations = {}  # for clutter observations
-        self.observations = {}  # for true observations and clutter
+        self.true_observations = {}  # for true particles
+        self.clutter_observations = {}  # for clutter particles
+        self.observations = {}  # for true and clutter particles
 
     def iterate(self, k):
         new_observations = []
@@ -39,8 +41,8 @@ class PHDGenerator:
             t = self.last_timestep_targets[i]
             # Apply Transition Model
             new_pos = self.transition_model.AdvanceState(t)
-            # TODO: do this x amount of times for x particles per target
-            n_particles = 1
+            # Create X particles per target
+            n_particles = self.ppt
             for p in range(n_particles):
                 new_meas = self.measurement_model.Measure(t)
 
@@ -56,8 +58,8 @@ class PHDGenerator:
         # Add New Births and their observations to next survivors
         for i in range(0, num_births):
             t = birth_pos[i]
-            # TODO: do this x amount of times for x particles per target
-            n_particles = 1
+            # Create X particles per target
+            n_particles = self.ppt
             for p in range(n_particles):
                 birth_meas = self.measurement_model.Measure(t)
 

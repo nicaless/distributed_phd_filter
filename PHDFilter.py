@@ -78,6 +78,7 @@ class PHDFilter:
         self.predicted_weights = new_weights
         self.predicted_num_targets = len(self.predicted_pos)
 
+    # TODO: simpler way of updating weights?
     def update(self, measurements):
         # Get the Weight Update
         weight_update = np.zeros(np.array(self.predicted_weights).shape)
@@ -105,8 +106,6 @@ class PHDFilter:
                       weight_update
 
         self.updated_weights = new_weights
-        # print(self.updated_weights)
-        # print(np.sum(self.updated_weights))
 
     def resample(self):
         particle_mass = np.sum(self.updated_weights)
