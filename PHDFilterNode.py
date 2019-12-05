@@ -6,7 +6,7 @@ from scipy.stats import norm
 from target import Target
 
 
-class PHDFilter:
+class PHDFilterNode:
     def __init__(self,
                  J=10,
                  region=[(-100, 100), (-100, 100)]
@@ -16,7 +16,7 @@ class PHDFilter:
         self.J = J
         self.region = region
         self.detection_probability = .98
-        self.clutter_prob = 0
+        self.clutter_prob = 0.01
 
         self.particles = {}
         self.current_particles = []
@@ -61,6 +61,8 @@ class PHDFilter:
         new_positions = new_positions + birth_particles
         new_weights = new_weights + birth_weights
 
+        # TODO: add clutter?
+
         self.predicted_pos = new_positions
         self.predicted_weights = new_weights
         self.predicted_num_targets = len(self.predicted_pos)
@@ -104,7 +106,6 @@ class PHDFilter:
     def resample(self):
         particle_mass = np.sum(self.updated_weights)
         true_target_indices = Resample(np.array(self.updated_weights) / particle_mass)
-        print(true_target_indices)
         true_particles = [self.predicted_pos[i] for i in true_target_indices]
         true_weights = [self.updated_weights[i] * np.ceil(particle_mass)
                         for i in true_target_indices]
@@ -120,17 +121,17 @@ class PHDFilter:
             particle_positions_matrix[p][1] = self.resampled_pos[p][1]
         estimated_total_targets = int(np.ceil(np.sum(self.resampled_weights)))
 
-        # TODO: fix...
         # estimated_total_targets = max(estimated_total_targets,
         #                               len(self.birth_models))
         if len(self.resampled_pos) == 1:
             self.centroids = particle_positions_matrix
         else:
-            centroids, idx = vq.kmeans2(x, estimated_total_targets)
+            centroids, idx = vq.kmeans2(particle_positions_matrix,
+                                        estimated_total_targets)
             self.centroids = centroids
 
     # psi = detection_prob * prob we receive measurement particle pos
-    def CalcPsi(self, measurements, positions, measurement_variance=1):
+    def CalcPsi(self, measurements, positions, measurement_variance=20):
         psi_mat = {}
         for i, m in enumerate(measurements):
             psi_mat[i] = []
@@ -201,16 +202,15 @@ class PHDFilter:
     # TODO: add a reset
     def step_through(self, measurements, folder='results'):
         for i, m in measurements.items():
-            print(i)
             self.predict()
             self.update(m)
             self.resample()
             self.estimate()
             self.plot(i, folder=folder)
 
-            self.targets[i] = self.resampled_pos
-            self.current_targets = self.resampled_pos
-            self.num_current_targets = len(self.current_targets)
+            self.particles[i] = self.resampled_pos
+            self.current_particles = self.resampled_pos
+            self.num_current_particles = len(self.current_particles)
             self.weights[i] = self.resampled_weights
             self.current_weights = self.resampled_weights
             self.centroid_movement[i] = self.centroids
@@ -230,7 +230,7 @@ class PHDFilter:
             for p in pos:
                 x.append(p[0])
                 y.append(p[1])
-            plt.plot(x, y, label=t)
+            plt.scatter(x, y, label=t)
 
         plt.legend()
         plt.savefig('centroids.png')

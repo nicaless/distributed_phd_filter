@@ -37,6 +37,8 @@ class Target:
         next_state[1, 0] = next_state[1, 0] + np.random.randn() * Qsim[1, 1]
         self.state = next_state
         self.all_states.append(next_state)
+        if x is not None:
+            return next_state
 
     def get_measurement(self):
         current_pos = np.dot(self.H, self.state)
