@@ -40,6 +40,11 @@ class PHDFilterNode:
         # target centroids
         self.centroids = []
         self.centroid_movement = {}
+        self.est_num_targets = len(self.centroids)
+
+        # rescaled weights (after fusion)
+        self.rescaled_weights = []
+        self.adjusted_centroids = []
 
     def predict(self):
         # Get New Positions for Existing Particles
@@ -114,21 +119,28 @@ class PHDFilterNode:
         self.resampled_weights = true_weights
         self.resampled_num_targets = len(self.resampled_pos)
 
-    def estimate(self):
+    def estimate(self, rescale=False):
         particle_positions_matrix = np.zeros((len(self.resampled_pos), 2))
         for p in range(len(self.resampled_pos)):
             particle_positions_matrix[p][0] = self.resampled_pos[p][0]
             particle_positions_matrix[p][1] = self.resampled_pos[p][1]
-        estimated_total_targets = int(np.ceil(np.sum(self.resampled_weights)))
+        if rescale:
+            estimated_total_targets = int(np.round(np.sum(self.rescaled_weights), 0))
+        else:
+            estimated_total_targets = int(np.round(np.sum(self.resampled_weights), 0))
 
         # estimated_total_targets = max(estimated_total_targets,
         #                               len(self.birth_models))
-        if len(self.resampled_pos) == 1:
-            self.centroids = particle_positions_matrix
+        if estimated_total_targets == 0:
+            centroids = []
+        elif len(self.resampled_pos) == 1:
+            centroids = particle_positions_matrix
         else:
             centroids, idx = vq.kmeans2(particle_positions_matrix,
                                         estimated_total_targets)
-            self.centroids = centroids
+            centroids = centroids
+
+        self.centroids = centroids
 
     # psi = detection_prob * prob we receive measurement particle pos
     def CalcPsi(self, measurements, positions, measurement_variance=20):
@@ -193,7 +205,7 @@ class PHDFilterNode:
         for t in self.centroids:
             x.append(t[0])
             y.append(t[1])
-        plt.scatter(x, y, label='centroid', color='black')
+        plt.scatter(x, y, label='centroid', color='black', s=50)
 
         plt.legend()
         plt.savefig('{folder}/{k}.png'.format(folder=folder, k=k))
@@ -214,6 +226,7 @@ class PHDFilterNode:
             self.weights[i] = self.resampled_weights
             self.current_weights = self.resampled_weights
             self.centroid_movement[i] = self.centroids
+            self.est_num_targets = len(self.centroids)
 
     def plot_centroids(self):
         targets = {}
@@ -234,6 +247,16 @@ class PHDFilterNode:
 
         plt.legend()
         plt.savefig('centroids.png')
+
+    def weightScale(self, avg_num_targets):
+        rescaled_weights = []
+        local_num_targets = len(self.centroids)
+        if local_num_targets == 0:
+            local_num_targets = 0.01
+        for w in self.current_weights:
+            scale = avg_num_targets / float(local_num_targets)
+            rescaled_weights.append(scale * w)
+        self.rescaled_weights = rescaled_weights
 
 
 # Copied form here:

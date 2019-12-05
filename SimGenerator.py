@@ -103,6 +103,7 @@ class SimGenerator:
         self.observations = {}
 
     def plot_iter(self, k, folder='data', show_clutter=False):
+        plt.clf()
         plt.xlim([self.region[0][0], self.region[0][1]])
         plt.ylim([self.region[1][0], self.region[1][1]])
 

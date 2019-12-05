@@ -23,52 +23,75 @@ class FilterTests(TestCase):
     def tearDown(self):
         super().tearDown()
 
-    def test_predict(self):
-        self.node.predict()
+    # def test_predict(self):
+    #     self.node.predict()
+    #
+    #     assert self.node.predicted_pos[0].shape == (4, 1)
+    #
+    #     assert_raises(AssertionError, assert_array_equal,
+    #                   self.node.current_particles,
+    #                   self.node.predicted_pos)
+    #
+    #     assert_raises(AssertionError, assert_array_equal,
+    #                   self.node.current_weights,
+    #                   self.node.predicted_weights)
+    #
+    # def test_update(self):
+    #     self.node.predict()
+    #     self.node.update(self.generator.observations[0])
+    #
+    #     assert len(self.node.predicted_weights) == \
+    #            len(self.node.updated_weights)
+    #     assert_raises(AssertionError, assert_array_equal,
+    #                   self.node.predicted_weights,
+    #                   self.node.updated_weights)
+    #
+    # def test_resample(self):
+    #     self.node.predict()
+    #     self.node.update(self.generator.observations[0])
+    #     self.node.resample()
+    #
+    #     assert len(self.node.resampled_pos) == \
+    #            len(self.node.resampled_weights)
+    #
+    #     assert_raises(AssertionError, assert_array_equal,
+    #                   self.node.updated_weights,
+    #                   self.node.resampled_weights)
+    #
+    # def test_estimate(self):
+    #     self.node.predict()
+    #     self.node.update(self.generator.observations[0])
+    #     self.node.resample()
+    #     self.node.estimate()
+    #
+    #     assert self.node.centroids.shape[0] >= 1
+    #     assert self.node.centroids.shape[1] == 2
 
-        assert self.node.predicted_pos[0].shape == (4, 1)
+    # def test_step_through(self):
+    #     self.node.step_through(self.generator.observations)
+    #     self.node.plot_centroids()
 
-        assert_raises(AssertionError, assert_array_equal,
-                      self.node.current_particles,
-                      self.node.predicted_pos)
+    def test_step_through_rescale(self):
+        for i, o in self.generator.observations.items():
+            true_targets = len(self.generator.true_targets[i])
+            print(i, true_targets)
+            self.node.predict()
+            self.node.update(o)
+            self.node.resample()
+            self.node.estimate()
+            self.node.plot(i, folder='results')
+            self.node.weightScale(true_targets)
+            self.node.estimate(rescale=True)
+            self.node.plot(i, folder='results2')
 
-        assert_raises(AssertionError, assert_array_equal,
-                      self.node.current_weights,
-                      self.node.predicted_weights)
+            self.node.particles[i] = self.node.resampled_pos
+            self.node.current_particles = self.node.resampled_pos
+            self.node.num_current_particles = len(self.node.current_particles)
+            self.node.weights[i] = self.node.resampled_weights
+            self.node.current_weights = self.node.resampled_weights
+            self.node.centroid_movement[i] = self.node.centroids
+            self.est_num_targets = len(self.node.centroids)
 
-    def test_update(self):
-        self.node.predict()
-        self.node.update(self.generator.observations[0])
 
-        assert len(self.node.predicted_weights) == \
-               len(self.node.updated_weights)
-        assert_raises(AssertionError, assert_array_equal,
-                      self.node.predicted_weights,
-                      self.node.updated_weights)
-
-    def test_resample(self):
-        self.node.predict()
-        self.node.update(self.generator.observations[0])
-        self.node.resample()
-
-        assert len(self.node.resampled_pos) == \
-               len(self.node.resampled_weights)
-
-        assert_raises(AssertionError, assert_array_equal,
-                      self.node.updated_weights,
-                      self.node.resampled_weights)
-
-    def test_estimate(self):
-        self.node.predict()
-        self.node.update(self.generator.observations[0])
-        self.node.resample()
-        self.node.estimate()
-        print(self.node.centroids)
-
-        assert self.node.centroids.shape[0] >= 1
-        assert self.node.centroids.shape[1] == 2
-
-    def test_step_through(self):
-        self.node.step_through(self.generator.observations)
         self.node.plot_centroids()
 
