@@ -89,30 +89,59 @@ class FilterTests(TestCase):
                       self.filter.predicted_weights,
                       self.filter.updated_weights)
 
-    # def test_resample(self):
-    #     self.filter.predict()
-    #     self.filter.update(self.generator.observations[0])
-    #     print('resample')
-    #     self.filter.resample()
-    #     print(self.filter.resampled_weights)
-    #     print(np.sum(self.filter.resampled_weights))
-    #
-    #     assert len(self.filter.resampled_pos) == \
-    #            len(self.filter.resampled_weights)
-    #
-    #     assert_raises(AssertionError, assert_array_equal,
-    #                   self.filter.updated_weights,
-    #                   self.filter.resampled_weights)
+    def test_resample(self):
+        self.filter.predict()
+        self.filter.update(self.generator.observations[0])
+        print('resample')
+        self.filter.resample()
+        print(self.filter.resampled_weights)
+        print(np.sum(self.filter.resampled_weights))
 
-    # def test_estimate(self):
-    #     self.filter.predict()
-    #     self.filter.update(self.generator.observations[0])
-    #     self.filter.resample()
-    #     self.filter.estimate()
-    #
-    #     assert self.filter.centroids.shape[0] >= 1
-    #     assert self.filter.centroids.shape[1] == 2
-    #
+        assert len(self.filter.resampled_pos) == \
+               len(self.filter.resampled_weights)
+
+        assert_raises(AssertionError, assert_array_equal,
+                      self.filter.updated_weights,
+                      self.filter.resampled_weights)
+
+    def test_resample2(self):
+        self.filter.predict()
+        self.filter.update2(self.generator.observations[0])
+        print('resample2')
+        self.filter.resample()
+        print(self.filter.resampled_weights)
+        print(np.sum(self.filter.resampled_weights))
+
+        assert len(self.filter.resampled_pos) == \
+               len(self.filter.resampled_weights)
+
+        assert_raises(AssertionError, assert_array_equal,
+                      self.filter.updated_weights,
+                      self.filter.resampled_weights)
+
+    def test_estimate(self):
+        self.filter.predict()
+        self.filter.update(self.generator.observations[0])
+        self.filter.resample()
+        self.filter.estimate()
+        print("test_estimate")
+        print(self.filter.centroids)
+
+        assert self.filter.centroids.shape[0] >= 1
+        assert self.filter.centroids.shape[1] == 2
+
+    def test_estimate2(self):
+        self.filter.predict()
+        self.filter.update2(self.generator.observations[0])
+        self.filter.resample()
+        self.filter.estimate()
+        print("test_estimate2")
+        print(self.filter.centroids)
+        print(self.generator.true_targets)
+
+        assert self.filter.centroids.shape[0] >= 1
+        assert self.filter.centroids.shape[1] == 2
+
     # def test_plot(self):
     #     self.filter.predict()
     #     self.filter.update(self.generator.observations[0])
