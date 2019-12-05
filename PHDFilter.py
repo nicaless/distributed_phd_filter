@@ -78,7 +78,16 @@ class PHDFilter:
         self.predicted_weights = new_weights
         self.predicted_num_targets = len(self.predicted_pos)
 
-    # TODO: simpler way of updating weights?
+    # TODO: fix. resulting weights seem incorrect, need to add way more weight to measurement
+    # for each measurement/particle combo calculate:
+    #   psi = detection_probability * probability we receive measurement at that particle position
+    #                                  (should be a func of distance between measure and particle, difference should be less than measurement variance)
+    # for each measurement calculate:
+    #   Ck = sum(psi * weight of particle)
+    # for each particle calculate:
+    #   1 - detection probability (detection_probability should be almost 1 if in FoV, 0 otherwise)
+    # + sum ( psi / clutter probability for measruement + Ck
+    # multiple above by old weight
     def update(self, measurements):
         # Get the Weight Update
         weight_update = np.zeros(np.array(self.predicted_weights).shape)
@@ -109,9 +118,16 @@ class PHDFilter:
 
     def resample(self):
         particle_mass = np.sum(self.updated_weights)
+        # print(particle_mass)
+        # print(self.updated_weights)
+        x = np.array(self.updated_weights) / particle_mass
+        # print(x)
+        # print(np.sum(x))
         true_target_indices = Resample(np.array(self.updated_weights) / particle_mass)
+        print(true_target_indices)
         true_particles = [self.predicted_pos[i] for i in true_target_indices]
-        true_weights = [self.updated_weights[i] for i in true_target_indices]
+        true_weights = [self.updated_weights[i] * np.ceil(particle_mass)
+                        for i in true_target_indices]
 
         self.resampled_pos = true_particles
         self.resampled_weights = true_weights
@@ -171,6 +187,7 @@ class PHDFilter:
     # TODO: add a reset
     def step_through(self, measurements, folder='results'):
         for i, m in measurements.items():
+            print(i)
             self.predict()
             self.update(m)
             self.resample()

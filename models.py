@@ -36,10 +36,17 @@ class Birth:
             #            self.region[0][0]
             # y_center = (self.region[1][1] - self.region[1][0]) + \
             #            self.region[1][0]
-            x_center = (self.region[0][1] - self.region[0][0]) / 2.
-            y_center = (self.region[1][1] - self.region[1][0]) / 2.
-            x = np.random.poisson(x_center) + self.region[0][0]
-            y = np.random.poisson(y_center) + self.region[1][0]
+            # x_center = (self.region[0][1] - self.region[0][0]) / 2.
+            # y_center = (self.region[1][1] - self.region[1][0]) / 2.
+            # x = np.random.poisson(x_center) + self.region[0][0]
+            # y = np.random.poisson(y_center) + self.region[1][0]
+            # positions.append(np.array([[x], [y], [0.], [0.]]))
+
+            # uniform birth
+            x = np.random.uniform(low=self.region[0][0],
+                                  high=self.region[0][1])
+            y = np.random.uniform(low=self.region[1][0],
+                                  high=self.region[1][1])
             positions.append(np.array([[x], [y], [0.], [0.]]))
 
         # return newborn targets and positions
