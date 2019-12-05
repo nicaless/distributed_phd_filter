@@ -24,8 +24,9 @@ class Target:
 
         self.process_noise = process_noise
 
-    def next_state(self):
-        x = self.state
+    def next_state(self, x=None):
+        if x is None:
+            x = self.state
         self.B[0, 0] = 0.1 * math.cos(x[2, 0])
         self.B[1, 0] = 0.1 * math.sin(x[2, 0])
         next_state = np.dot(self.A, x) + np.dot(self.B, self.U)

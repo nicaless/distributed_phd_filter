@@ -1,6 +1,8 @@
 import numpy as np
 import matplotlib.pyplot as plt
 from models import Resample
+import math
+from scipy.stats import norm
 
 
 class PHDFilter:
@@ -13,7 +15,8 @@ class PHDFilter:
                  estimation_model,
                  init_targets=[],
                  init_weights=[],
-                 J=10
+                 J=10,
+                 region=[(-100, 100), (-100, 100)]
                  ):
         # TODO: add region variable
         # TODO: update birth, clutter, measurement(?) models according to region(s) in view
@@ -24,6 +27,9 @@ class PHDFilter:
         self.survival_model = survival_model
         self.estimation_model = estimation_model
         self.J = J
+        self.region = region
+        self.detection_probability = .98
+        self.clutter_prob = 0
 
         # set of tracked positions of all targets
         # TODO: change naming to 'particles' instead of targets
@@ -88,6 +94,55 @@ class PHDFilter:
     #   1 - detection probability (detection_probability should be almost 1 if in FoV, 0 otherwise)
     # + sum ( psi / clutter probability for measruement + Ck
     # multiple above by old weight
+    def update2(self, measurements):
+        psi_mat = self.CalcPsi(measurements, self.predicted_pos)
+        Ck_m = self.CalcCk(psi_mat)
+
+        new_weights = []
+        for i, p in enumerate(self.predicted_pos):
+            sum_psi = 0
+            Ck = sum(Ck_m)
+            for m, m_psi in psi_mat.items():
+                sum_psi += m_psi[i]
+            w = (1 - self.DetectionProb(p)) + (sum_psi / Ck)
+            new_weights.append(w * self.predicted_weights[i])
+        self.updated_weights = new_weights
+
+    # psi = detection_prob * prob we receive measurement particle pos
+    def CalcPsi(self, measurements, positions, measurement_variance=1):
+        psi_mat = {}
+        for i, m in enumerate(measurements):
+            psi_mat[i] = []
+            x1 = m[0][0]
+            y1 = m[1][0]
+            for j, p in enumerate(positions):
+                x2 = p[0][0]
+                y2 = p[1][0]
+                dist = abs(math.sqrt((x2 - x1) ** 2 + (y2 - y1) ** 2))
+                prob_m_is_p = norm.sf(dist, 0, measurement_variance)
+                psi = self.DetectionProb((x2, y2)) * prob_m_is_p
+                psi_mat[i].append(psi)
+        return psi_mat
+
+    def DetectionProb(self, target):
+        x = target[0]
+        y = target[1]
+        if x < self.region[0][0] or x > self.region[0][1] \
+                or y < self.region[1][0] or y > self.region[1][1]:
+            return 0
+        else:
+            return self.detection_probability
+
+    # for each measurement calculate: Ck = sum(psi * weight of particle)
+    def CalcCk(self, psi_mat):
+        Ck_m = []
+        for i, particles_psi in psi_mat.items():
+            Ck = 0
+            for j, psi in enumerate(particles_psi):
+                Ck += psi * self.predicted_weights[j]
+            Ck_m.append(Ck)
+        return Ck_m
+
     def update(self, measurements):
         # Get the Weight Update
         weight_update = np.zeros(np.array(self.predicted_weights).shape)
@@ -220,6 +275,7 @@ class PHDFilter:
 
         plt.legend()
         plt.savefig('centroids.png')
+
 
 
 

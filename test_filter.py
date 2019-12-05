@@ -75,20 +75,34 @@ class FilterTests(TestCase):
                       self.filter.predicted_weights,
                       self.filter.updated_weights)
 
-    def test_resample(self):
+    def test_update2(self):
         self.filter.predict()
-        self.filter.update(self.generator.observations[0])
-        print('resample')
-        self.filter.resample()
-        print(self.filter.resampled_weights)
-        print(np.sum(self.filter.resampled_weights))
+        print('update_results2')
+        self.filter.update2(self.generator.observations[0])
+        print(self.filter.predicted_weights)
+        print(self.filter.updated_weights)
+        print(np.sum(self.filter.updated_weights))
 
-        assert len(self.filter.resampled_pos) == \
-               len(self.filter.resampled_weights)
-
+        assert len(self.filter.predicted_weights) == \
+               len(self.filter.updated_weights)
         assert_raises(AssertionError, assert_array_equal,
-                      self.filter.updated_weights,
-                      self.filter.resampled_weights)
+                      self.filter.predicted_weights,
+                      self.filter.updated_weights)
+
+    # def test_resample(self):
+    #     self.filter.predict()
+    #     self.filter.update(self.generator.observations[0])
+    #     print('resample')
+    #     self.filter.resample()
+    #     print(self.filter.resampled_weights)
+    #     print(np.sum(self.filter.resampled_weights))
+    #
+    #     assert len(self.filter.resampled_pos) == \
+    #            len(self.filter.resampled_weights)
+    #
+    #     assert_raises(AssertionError, assert_array_equal,
+    #                   self.filter.updated_weights,
+    #                   self.filter.resampled_weights)
 
     # def test_estimate(self):
     #     self.filter.predict()

@@ -242,5 +242,3 @@ def Resample(weights):
 
     return np.unique(indexes)
 
-
-
