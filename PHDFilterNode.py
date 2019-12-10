@@ -1,3 +1,4 @@
+from copy import deepcopy
 import math
 import matplotlib.pyplot as plt
 import numpy as np
@@ -8,82 +9,55 @@ from target import Target
 
 class PHDFilterNode:
     def __init__(self,
-                 J=10,
-                 region=[(-100, 100), (-100, 100)]
+                 birthgmm,
+                 region=[(-50, 50), (-50, 50)]
                  ):
-        self.target_model = Target()
-        self.survival_prob = 0.9
-        self.J = J
+        self.birthgmm = birthgmm
+        self.targets = []
+        self.survival_prob = 0.98
+        self.detection_probability = 0.95
+        self.clutter_intensity = 0.005  # clutter total is 5
         self.region = region
-        self.detection_probability = .98
-        self.clutter_prob = 0.01
-
-        self.particles = {}
-        self.current_particles = []
-        self.num_current_particles = 0
-        self.weights = {}
-        self.current_weights = []
 
         # prediction results
         self.predicted_pos = []
         self.predicted_weights = []
-        self.predicted_num_targets = len(self.predicted_pos)
 
         # update results
         self.updated_weights = []
 
-        # resample results
-        self.resampled_pos = []
-        self.resampled_weights = []
-        self.resampled_num_targets = len(self.resampled_pos)
-
-        # target centroids
-        self.centroids = []
-        self.centroid_movement = {}
-        self.est_num_targets = len(self.centroids)
+        # # resample results
+        # self.resampled_pos = []
+        # self.resampled_weights = []
+        # self.resampled_num_targets = len(self.resampled_pos)
+        #
+        # # target centroids
+        # self.centroids = []
+        # self.centroid_movement = {}
+        # self.est_num_targets = len(self.centroids)
 
         # rescaled weights (after fusion)
         self.rescaled_weights = []
         self.adjusted_centroids = []
 
     def predict(self):
-        # Get New Positions for Existing Particles
-        # Update Weights for Targets using Survival Probability
-        # TODO: static survival probability, should be a function of position relative to FoV (region)
-        new_positions = []
-        new_weights = []
-        for i, p in enumerate(self.current_particles):
-            w = self.current_weights[i] * self.survival_prob
-            p = self.target_model.next_state(x=p)
-            new_positions.append(p)
-            new_weights.append(w)
+        # Existing Targets
+        updated = [deepcopy(t) for t in self.targets]
+        for t in updated:
+            t.next_state()
+            t.weight = t.weight * self.survival_prob
 
-        # Sample from Birth Model
-        # Assign weights to new births
-        birth_particles = self.birth(self.J)
-        birth_weights = [1. / self.J for i in range(self.J)]
+        # new born targets
+        born = [deepcopy(t) for t in self.birthgmm]
 
-        new_positions = new_positions + birth_particles
-        new_weights = new_weights + birth_weights
-
-        # TODO: add clutter?
-
-        self.predicted_pos = new_positions
-        self.predicted_weights = new_weights
-        self.predicted_num_targets = len(self.predicted_pos)
-
-    def birth(self, N):
-        new_particles = []
-        for k in range(0, N):
-            # uniform birth
-            x = np.random.uniform(low=self.region[0][0],
-                                  high=self.region[0][1])
-            y = np.random.uniform(low=self.region[1][0],
-                                  high=self.region[1][1])
-            new_particles.append(np.array([[x], [y], [0.], [0.]]))
-
-        # return newborn targets and positions
-        return new_particles
+        all_targets = updated + born
+        predicted_pos = []
+        predicted_weights = []
+        for p in all_targets:
+            predicted_pos.append(p.get_measurements)
+            predicted_weights.append(p.weight)
+        self.predicted_pos = predicted_pos
+        self.predicted_weights = predicted_weights
 
     # for each measurement/particle combo calculate:
     #   psi = detection_probability * probability we receive measurement at that particle position
