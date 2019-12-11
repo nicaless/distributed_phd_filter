@@ -10,8 +10,9 @@ class Target:
                  process_noise=0.001,
                  step=3):
         self.state = init_state
-        self.cov = init_cov
+        self.state_cov = init_cov
         self.weight = init_weight
+        self.measure_cov = init_cov
 
         self.all_states = []
         self.all_states.append(init_state)
@@ -29,6 +30,7 @@ class Target:
         self.Q = np.eye(init_state.shape[0])
 
         self.H = np.array([[1, 0, 0, 0], [0, 1, 0, 0]])
+        self.R = np.eye(2)
 
         self.process_noise = process_noise
 
@@ -46,15 +48,18 @@ class Target:
         self.state = next_state
         self.all_states.append(next_state)
 
-        next_cov = np.dot(self.A, np.dot(self.cov, self.A.T)) + self.Q
-        self.cov = next_cov
+        next_cov = np.dot(self.A, np.dot(self.state_cov, self.A.T)) + self.Q
+        self.state_cov = next_cov
         self.all_cov.append(next_cov)
 
     def get_measurement(self):
         obs = np.dot(self.H, self.state)
+        self.measure_cov = self.R + np.dot(self.H,
+                                           np.dot(self.state_cov, self.H.T))
+
         return obs
 
     def sample(self, N=1):
-        return np.random.multivariate_normal(self.state.flat, self.cov, size=N)
+        return np.random.multivariate_normal(self.state.flat, self.state_cov, size=N)
 
 

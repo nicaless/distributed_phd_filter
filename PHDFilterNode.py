@@ -22,6 +22,7 @@ class PHDFilterNode:
         # prediction results
         self.predicted_pos = []
         self.predicted_weights = []
+        self.predicted_targets = []
 
         # update results
         self.updated_weights = []
@@ -54,32 +55,51 @@ class PHDFilterNode:
         predicted_pos = []
         predicted_weights = []
         for p in all_targets:
-            predicted_pos.append(p.get_measurements)
+            predicted_pos.append(p.get_measurement())
             predicted_weights.append(p.weight)
         self.predicted_pos = predicted_pos
         self.predicted_weights = predicted_weights
+        self.predicted_targets = all_targets
 
-    # for each measurement/particle combo calculate:
-    #   psi = detection_probability * probability we receive measurement at that particle position
-    #                                  (should be a func of distance between measure and particle, difference should be less than measurement variance)
-    # for each measurement calculate:
-    #   Ck = sum(psi * weight of particle)
-    # for each particle calculate:
-    #   1 - detection probability (detection_probability should be almost 1 if in FoV, 0 otherwise)
-    # + sum ( psi / clutter probability for measruement + Ck
-    # multiple above by old weight
     def update(self, measurements):
-        psi_mat = self.CalcPsi(measurements, self.predicted_pos)
-        Ck_m = self.CalcCk(psi_mat)
+        # Create Update Components
+        nu = self.predicted_pos  # expected observation from prediction
+        s = [t.measure_cov for t in self.predicted_targets]  # cov of expected observation from prediction
 
-        new_weights = []
-        for i, p in enumerate(self.predicted_pos):
-            sum_psi = 0
-            Ck = sum(Ck_m)
-            for m, m_psi in psi_mat.items():
-                sum_psi += m_psi[i]
-            w = (1 - self.DetectionProb(p)) + (sum_psi / (self.clutter_prob + Ck))
-            new_weights.append(w * self.predicted_weights[i])
+        K = [np.dot(np.dot(comp.state_cov, comp.H.T),
+                    np.linalg.inv(s[index]))
+             for index, comp in enumerate(self.predicted_targets)]
+        PKK = [np.dot(np.eye(len(K[index])) - np.dot(K[index], comp.H),
+                      comp.state_cov)
+               for index, comp in enumerate(self.predicted_targets)]
+
+        newgmm = [Target(init_weight=comp.weight * (1.0 - self.detection_probability),
+                         init_state=comp.state,
+                         init_cov=comp.state_cov)
+                  for comp in self.predicted_targets]
+
+        for m in measurements:
+            newgmmpartial = []
+            weightsum = 0
+            for index, comp in enumerate(self.predicted_targets):
+                obs_probability = dmvnorm(nu[index], s[index], m)
+                newcomp_weight = comp.weight * self.detection_probability * obs_probability
+                newcomp_state = comp.state + np.dot(K, m - nu[index])
+                newcomp_state_cov = comp.state_cov
+                newgmmpartial.append(Target(init_weight=newcomp_weight,
+                                            init_state=newcomp_state,
+                                            init_cov=newcomp_state_cov))
+                weightsum += newcomp_weight
+
+            # Scale Weights
+            reweighter = 1.0 / (self.clutter_intensity + weightsum)
+            for comp in newgmmpartial:
+                comp.weight *= reweighter
+
+            newgmm.extend(newgmmpartial)
+
+        self.targets = newgmm
+        new_weights = [t.weight for t in self.targets]
         self.updated_weights = new_weights
 
     def resample(self):
@@ -231,6 +251,22 @@ class PHDFilterNode:
             scale = avg_num_targets / float(local_num_targets)
             rescaled_weights.append(scale * w)
         self.rescaled_weights = rescaled_weights
+
+
+def dmvnorm(state, cov, obs):
+    """
+    Evaluate a multivariate normal, given a state (vector) and covariance (matrix) and a position x (vector) at which to evaluate"
+    :param state:
+    :param cov:
+    :param obs:
+    :return:
+    """
+    k = state.shape[0]
+    part1 = (2.0 * np.pi) ** (-k * 0.5)
+    part2 = np.power(np.linalg.det(cov), -0.5)
+    dist = obs - state
+    part3 = np.exp(-0.5 * np.dot(np.dot(dist.T, np.linalg.inv(cov)), dist))
+    return part1 * part2 * part3
 
 
 # Copied form here:

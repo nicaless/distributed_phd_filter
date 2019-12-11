@@ -3,6 +3,7 @@ from unittest import TestCase
 import numpy as np
 from numpy.testing import assert_array_equal, assert_raises
 
+from PHDFilterNode import PHDFilterNode
 from SimGenerator import SimGenerator
 from target import Target
 
@@ -18,21 +19,24 @@ class GMPHDTest(TestCase):
         self.generator.generate(20)
         self.generator.plot(show_clutter=True)
 
-        # self.birthgmm = []
-        # for x in range(-50, 50, 5):
-        #     for y in range(-50, 50, 5):
-        #         target = Target(init_state=np.array([[x], [y], [0.0], [0.0]]))
-        #         self.birthgmm.append(target)
+        self.birthgmm = []
+        for x in range(-50, 50, 5):
+            for y in range(-50, 50, 5):
+                target = Target(init_state=np.array([[x], [y], [0.0], [0.0]]))
+                self.birthgmm.append(target)
+
+        self.filternode = PHDFilterNode(self.birthgmm)
+
 
     def tearDown(self):
         super().tearDown()
 
     def test_target_next_state(self):
         init_state = self.target.state
-        init_cov = self.target.cov
+        init_cov = self.target.state_cov
         self.target.next_state()
         next_state = self.target.state
-        next_cov = self.target.cov
+        next_cov = self.target.state_cov
 
         assert_raises(AssertionError, assert_array_equal,
                       init_state, next_state)
@@ -55,3 +59,18 @@ class GMPHDTest(TestCase):
         second_sample = self.target.sample()
 
         assert first_sample.shape == second_sample.shape
+
+    def test_node_predict(self):
+        old_targets = self.filternode.targets
+        self.filternode.predict()
+        new_targets = self.filternode.targets
+        print(old_targets)
+        print(new_targets)
+
+        assert len(self.filternode.predicted_pos) == len(self.filternode.predicted_targets)
+
+    def test_node_update(self):
+        self.filternode.predict()
+        self.filternode.update(self.generator.observations[0])
+        #TODO: write an actual test
+
