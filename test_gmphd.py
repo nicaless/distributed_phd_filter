@@ -25,7 +25,7 @@ class GMPHDTest(TestCase):
                 target = Target(init_state=np.array([[x], [y], [0.0], [0.0]]))
                 self.birthgmm.append(target)
 
-        self.filternode = PHDFilterNode(self.birthgmm)
+        self.filternode = PHDFilterNode(0, self.birthgmm)
 
     def tearDown(self):
         super().tearDown()

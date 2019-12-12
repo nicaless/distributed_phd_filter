@@ -10,12 +10,14 @@ from target import Target
 
 class PHDFilterNode:
     def __init__(self,
+                 node_id,
                  birthgmm,
                  prune_thresh=1e-6,
                  merge_thresh=0.01,
                  max_comp=100,
                  region=[(-50, 50), (-50, 50)]
                  ):
+        self.node_id = node_id
         self.birthgmm = birthgmm
         self.prune_thresh = prune_thresh
         self.merge_thresh = merge_thresh
@@ -39,6 +41,9 @@ class PHDFilterNode:
 
         # merged results
         self.merged_targets = []
+
+        # fusion results
+        self.fusion_targets = []
 
     def predict(self):
         # Existing Targets
@@ -76,6 +81,8 @@ class PHDFilterNode:
                   for comp in self.predicted_targets]
 
         for m in measurements:
+            if self.check_measure_oob(m):
+                continue
             newgmmpartial = []
             weightsum = 0
             for index, comp in enumerate(self.predicted_targets):
@@ -98,6 +105,15 @@ class PHDFilterNode:
             newgmm.extend(newgmmpartial)
 
         self.updated_targets = newgmm
+
+    def check_measure_oob(self, m):
+        x = m[0][0]
+        y = m[1][0]
+
+        x_out_of_bounds = x < self.region[0][0] or x > self.region[0][1]
+        y_out_of_bounds = y < self.region[1][0] or y > self.region[1][1]
+
+        return x_out_of_bounds or y_out_of_bounds
 
     def prune(self):
         prunedgmm = list(filter(lambda comp: comp.weight > self.prune_thresh,
@@ -169,7 +185,7 @@ class PHDFilterNode:
         x, y = self.extractstates()
         plt.scatter(x, y)
 
-        plt.legend()
+        # plt.legend()
         plt.savefig('{folder}/{k}.png'.format(folder=folder, k=k))
         plt.clf()
 
