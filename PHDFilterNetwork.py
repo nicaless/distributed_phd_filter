@@ -18,6 +18,7 @@ class PHDFilterNetwork:
         self.target_estimates = []
 
         self.node_share = {}
+        self.node_keep = {}
 
     def step_through(self, measurements, folder='results'):
         for id, n in nx.get_node_attributes(self.network, 'node').items():
@@ -37,6 +38,32 @@ class PHDFilterNetwork:
 
         self.node_share[node_id]['neighbor_comps'] = neighbor_comps
 
+    def get_closest_comps(self, node_id):
+        node_comps = self.node_share[node_id]['node_comps']
+        neighbor_comps = self.node_share[node_id]['neighbor_comps']
+
+        keep_comps = {}
+        for i in range(len(node_comps)):
+            keep_comps[i] = []
+            x_state = node_comps[i].state
+            x_cov = node_comps[i].state_cov
+            for neighbor, n_comps in neighbor_comps.items():
+                y_weight = nx.get_node_attributes(self.network, 'weights')[neighbor]
+                d = 1e5
+                current_closest = None
+                for neighbor_comp in n_comps:
+                    y_state = neighbor_comp.state
+                    new_d = float(np.dot(np.dot((x_state - y_state).T,
+                                            np.linalg.inv(x_cov)),
+                                     x_state - y_state))
+                    if new_d < d:
+                        current_closest = neighbor_comp
+                        d = new_d
+                if current_closest is not None:
+                    keep_comps[i].append((y_weight, current_closest))
+
+        self.node_keep[node_id] = keep_comps
+
     # Each node to replace targets variable with fusion_targets variable (after L fusion iterations)
     def update_comps(self):
         pass
@@ -46,24 +73,29 @@ class PHDFilterNetwork:
         pass
 
     def fuse_covs(self, node_id):
+        # Use self.node_keep to fuse only the closest components among all neighbors
+        # If no close components skip fusion for this component
+
         node_comps = self.node_share[node_id]['node_comps']
-        neighbor_comps = self.node_share[node_id]['neighbor_comps']
+        closest_neighbor_comps = self.node_keep[node_id]
 
         weight = nx.get_node_attributes(self.network, 'weights')[node_id]
 
-        # Only going to merge up to the min num of components among neighbors
-        min_comp = min([len(node_comps)] +
-                       [len(cs) for n, cs in neighbor_comps.items()])
-
         new_covs = []
-        for i in range(min_comp):
+        for i in range(len(node_comps)):
             comp_cov_inv = np.linalg.inv(node_comps[i].state_cov)
             sum_covs = weight * comp_cov_inv
-            for neighbor, n_comps in neighbor_comps.items():
-                n_weight = nx.get_node_attributes(self.network, 'weights')[neighbor]
-                n_comp_cov_inv = np.linalg.inv(n_comps[i].state_cov)
+
+            if len(closest_neighbor_comps[i]) == 0:
+                new_covs.append(sum_covs)
+                continue
+
+            for c in closest_neighbor_comps[i]:
+                n_weight = c[0]
+                n_comp = c[1]
+                n_comp_cov_inv = np.linalg.inv(n_comp.state_cov)
                 sum_covs += n_weight * n_comp_cov_inv
-            new_covs.append(np.linalg.inv(sum_covs))
+            new_covs.append(sum_covs)
 
         return new_covs
 
@@ -144,7 +176,7 @@ class PHDFilterNetwork:
         return sum_covs_comp
 
     # For fusing the alphas, first need to calc all state difference combos
-    def state_diffs(self, node_id):
+    # def state_diffs(self, node_id):
 
 
     @staticmethod
