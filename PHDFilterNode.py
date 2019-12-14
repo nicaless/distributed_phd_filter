@@ -13,7 +13,8 @@ class PHDFilterNode:
                  node_id,
                  birthgmm,
                  prune_thresh=1e-6,
-                 merge_thresh=0.01,
+                 # merge_thresh=0.01,
+                 merge_thresh=1,
                  max_comp=100,
                  region=[(-50, 50), (-50, 50)]
                  ):
@@ -133,12 +134,15 @@ class PHDFilterNode:
             del sourcegmm[w]
 
             # Find all nearby components and delete
-            distances = [float(
-                np.dot(
-                    np.dot((comp.state - weightiest.state).T,
-                           np.linalg.inv(comp.state_cov)),
-                    comp.state - weightiest.state))
-                for comp in sourcegmm]
+            # distances = [float(
+            #     np.dot(
+            #         np.dot((comp.state - weightiest.state).T,
+            #                np.linalg.inv(comp.state_cov)),
+            #         comp.state - weightiest.state))
+            #     for comp in sourcegmm]
+            distances = [math.hypot(comp.state[0][0] - weightiest.state[0][0],
+                                    comp.state[1][0] - weightiest.state[1][0]
+                                    ) for comp in sourcegmm]
 
             tosubsume = np.array([d <= self.merge_thresh for d in distances])
             subsumed = [weightiest]
@@ -208,7 +212,8 @@ class PHDFilterNode:
                 self.targets = self.merged_targets
                 self.plot(i, folder=folder)
 
-    def extractstates(self, thresh=0.2):
+    # TODO: Extract up to however many targets I think there are (after carinality consensus)
+    def extractstates(self, thresh=0.1):
         x = []
         y = []
         for comp in self.targets:

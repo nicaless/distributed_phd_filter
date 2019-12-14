@@ -80,19 +80,21 @@ class GMPHDTest(TestCase):
     #     assert len(self.filternode.pruned_targets) <= \
     #            len(self.filternode.updated_targets)
 
-    # def test_node_merge(self):
-    #     self.filternode.predict()
-    #     self.filternode.update(self.generator.observations[0])
-    #     self.filternode.prune()
-    #     self.filternode.merge()
-    #     print(len(self.filternode.merged_targets))
-    #     print(len(self.filternode.pruned_targets))
-    #
-    #     assert len(self.filternode.merged_targets) <= \
-    #            len(self.filternode.pruned_targets)
+    def test_node_merge(self):
+        self.filternode.predict()
+        self.filternode.update(self.generator.observations[0])
+        self.filternode.prune()
+        self.filternode.merge()
+        print(len(self.generator.observations[0]))
+        print(len(self.filternode.merged_targets))
+        print(len(self.filternode.pruned_targets))
+        print(sum([t.weight for t in self.filternode.merged_targets]))
 
-    def test_node_step_through(self):
-        self.filternode.step_through(self.generator.observations)
+        assert len(self.filternode.merged_targets) <= \
+               len(self.filternode.pruned_targets)
+
+    # def test_node_step_through(self):
+    #     self.filternode.step_through(self.generator.observations)
 
 
 
