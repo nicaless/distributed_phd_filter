@@ -47,13 +47,14 @@ class SimGenerator:
             true_positions.append(target.get_measurement())
 
         # Generate New Births
+        # TODO: change to poisson sampling and start birth and one of the 4 corners
         x = np.random.random()
         if x < self.birth_prob:
             x = np.random.uniform(low=self.region[0][0],
                                   high=self.region[0][1])
             y = np.random.uniform(low=self.region[1][0],
                                   high=self.region[1][1])
-            new_target = Target(init_state=np.array([[x], [y], [0.0], [0.0]]))
+            new_target = Target(init_state=np.array([[x], [y], [0.1], [0.0]]))
             next_timestep_targets.append(new_target)
             true_positions.append(new_target.get_measurement())
 

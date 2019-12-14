@@ -3,8 +3,6 @@ import math
 import matplotlib.pyplot as plt
 import numpy as np
 from operator import attrgetter
-import scipy.cluster.vq as vq
-from scipy.stats import norm
 from target import Target
 
 
@@ -82,6 +80,7 @@ class PHDFilterNode:
                   for comp in self.predicted_targets]
 
         for m in measurements:
+            # TODO: also incorporate some randomness to detection of measurement
             if self.check_measure_oob(m):
                 continue
             newgmmpartial = []
@@ -194,14 +193,14 @@ class PHDFilterNode:
         plt.clf()
 
     # TODO: add a reset
-    def step_through(self, measurements, folder='results'):
+    def step_through(self, measurements, measurement_id=0, folder='results'):
         if not isinstance(measurements, dict):
             self.predict()
             self.update(measurements)
             self.prune()
             self.merge()
             self.targets = self.merged_targets
-            self.plot(0, folder=folder)
+            self.plot(measurement_id, folder=folder)
 
         else:
             for i, m in measurements.items():
@@ -212,15 +211,22 @@ class PHDFilterNode:
                 self.targets = self.merged_targets
                 self.plot(i, folder=folder)
 
-    # TODO: Extract up to however many targets I think there are (after carinality consensus)
-    def extractstates(self, thresh=0.1):
+    def extractstates(self, cardinality=None, thresh=0.1):
         x = []
         y = []
-        for comp in self.targets:
-            if comp.weight > thresh:
+        if cardinality is not None:
+            all_targets = self.targets[:cardinality]
+        else:
+            all_targets = self.targets
+
+        for comp in all_targets:
+            if cardinality is None and comp.weight > thresh:
                 for _ in range(int(np.ceil(comp.weight))):
                     x.append(comp.state[0][0])
                     y.append(comp.state[1][0])
+            else:
+                x.append(comp.state[0][0])
+                y.append(comp.state[0][0])
         return x, y
 
 

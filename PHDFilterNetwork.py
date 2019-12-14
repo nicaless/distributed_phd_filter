@@ -1,6 +1,7 @@
 import math
 import networkx as nx
 import numpy as np
+from operator import attrgetter
 
 from PHDFilterNode import dmvnorm
 from target import Target
@@ -22,18 +23,39 @@ class PHDFilterNetwork:
         self.node_share = {}
         self.cardinality = 0
         self.node_keep = {}
-        self.node_fuse = {}
+        # self.node_fuse = {}
 
-    def step_through(self, measurements, folder='results'):
-        # TODO: for each measurement
-        # step_through (save individual node estimates)
-        # share_info
-        # cardinality_consensus
-        # get_closest_comps
-        # update comps according to fusion strategy (save fused estimates)
-        for id, n in nx.get_node_attributes(self.network, 'node').items():
-            n.step_through(measurements, folder='{f}/{id}'.format(f=folder,
-                                                                  id=id))
+    # TODO: need test
+    def step_through(self, measurements, L=1, how='geom', folder='results'):
+        nodes = nx.get_node_attributes(self.network, 'node').items()
+        for i, m in enumerate(measurements):
+            for id, n in nodes.items():
+                n.step_through(m, folder='{f}/{id}'.format(f=folder, id=id))
+            self.cardinality_consensus()
+            for id, n in nodes.items():
+                self.reduce_comps(id)
+            for l in range(L):
+                for id, n in nodes.items():
+                    self.share_info(id)
+                    self.get_closest_comps(id)
+                    self.update_comps(how=how)
+            for id, n in nodes.items():
+                n.plot(i, folder='{f}/{id}_fuse'.format(f=folder, id=id))
+
+    def cardinality_consensus(self):
+        nodes = nx.get_node_attributes(self.network, 'node')
+        weights = nx.get_node_attributes(self.network, 'weights')
+        weight_sum = 0
+        for n in list(self.network.nodes()):
+            est = sum([t.weight for t in nodes[n].targets])
+            weight_sum += est * weights[n]
+        self.cardinality = np.ceil(weight_sum / float(len(nodes)))
+
+    def reduce_comps(self, node_id):
+        node = nx.get_node_attributes(self.network, 'node')[node_id]
+        node_comps = node.targets
+        keep_node_comps = node_comps[:self.cardinality]
+        node.targets = keep_node_comps
 
     def share_info(self, node_id):
         G = self.network
@@ -48,22 +70,11 @@ class PHDFilterNetwork:
 
         self.node_share[node_id]['neighbor_comps'] = neighbor_comps
 
-    def cardinality_consensus(self):
-        nodes = nx.get_node_attributes(self.network, 'node')
-        weights = nx.get_node_attributes(self.network, 'weights')
-        weight_sum = 0
-        for n in list(self.network.nodes()):
-            est = sum([t.weight for t in nodes[n].targets])
-            weight_sum += est * weights[n]
-        self.cardinality = np.ceil(weight_sum / float(len(nodes)))
-
     def get_closest_comps(self, node_id):
         node_comps = self.node_share[node_id]['node_comps']
         neighbor_comps = self.node_share[node_id]['neighbor_comps']
 
         keep_comps = {}
-        # TODO: change to only keep top N compoenents
-        N = self.cardinality
         for i in range(len(node_comps)):
             keep_comps[i] = []
             x_state = node_comps[i].state
@@ -87,15 +98,16 @@ class PHDFilterNetwork:
 
         self.node_keep[node_id] = keep_comps
 
-    def update_comps(self, L=3, how='geom'):
-        for i in range(L):
-            for n in list(self.network.nodes()):
-                if how == 'geom':
-                    new_comps = self.fuse_comps_geom(n)
-                else:
-                    new_comps = self.fuse_comps_arith(n)
-                self.node_fuse[n] = new_comps
-        # TODO: replace targets variable of each node with new fusion comps
+    def update_comps(self, how='geom'):
+        for n in list(self.network.nodes()):
+            if how == 'geom':
+                new_comps = self.fuse_comps_geom(n)
+            else:
+                new_comps = self.fuse_comps_arith(n)
+            # self.node_fuse[n] = new_comps
+            node = nx.get_node_attributes(self.network, 'node')[n]
+            node.targets = new_comps.sort(key=attrgetter('weight'),
+                                          reverse=True)
 
     def fuse_comps_arith(self, node_id):
         pass
