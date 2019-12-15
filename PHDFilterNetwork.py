@@ -23,14 +23,14 @@ class PHDFilterNetwork:
         self.node_share = {}
         self.cardinality = 0
         self.node_keep = {}
-        # self.node_fuse = {}
 
-    # TODO: need test
     def step_through(self, measurements, L=1, how='geom', folder='results'):
-        nodes = nx.get_node_attributes(self.network, 'node').items()
-        for i, m in enumerate(measurements):
+        nodes = nx.get_node_attributes(self.network, 'node')
+        if not isinstance(measurements, dict):
+            measurements = {0: measurements}
+        for i, m in measurements.items():
             for id, n in nodes.items():
-                n.step_through(m, folder='{f}/{id}'.format(f=folder, id=id))
+                n.step_through(m, i, folder='{f}/{id}'.format(f=folder, id=id))
             self.cardinality_consensus()
             for id, n in nodes.items():
                 self.reduce_comps(id)
@@ -38,9 +38,10 @@ class PHDFilterNetwork:
                 for id, n in nodes.items():
                     self.share_info(id)
                     self.get_closest_comps(id)
-                    self.update_comps(how=how)
+                self.update_comps(how=how)
             for id, n in nodes.items():
-                n.plot(i, folder='{f}/{id}_fuse'.format(f=folder, id=id))
+                n.plot(i, folder='{f}/{id}_fuse'.format(f=folder, id=id),
+                       cardinality=self.cardinality)
 
     def cardinality_consensus(self):
         nodes = nx.get_node_attributes(self.network, 'node')
@@ -49,7 +50,7 @@ class PHDFilterNetwork:
         for n in list(self.network.nodes()):
             est = sum([t.weight for t in nodes[n].targets])
             weight_sum += est * weights[n]
-        self.cardinality = np.ceil(weight_sum / float(len(nodes)))
+        self.cardinality = int(np.ceil(weight_sum / float(len(nodes))))
 
     def reduce_comps(self, node_id):
         node = nx.get_node_attributes(self.network, 'node')[node_id]
@@ -104,16 +105,31 @@ class PHDFilterNetwork:
                 new_comps = self.fuse_comps_geom(n)
             else:
                 new_comps = self.fuse_comps_arith(n)
-            # self.node_fuse[n] = new_comps
             node = nx.get_node_attributes(self.network, 'node')[n]
-            node.targets = new_comps.sort(key=attrgetter('weight'),
-                                          reverse=True)
+            new_comps.sort(key=attrgetter('weight'), reverse=True)
+            node.targets = new_comps
 
     def fuse_comps_arith(self, node_id):
-        pass
+        node_comps = self.node_share[node_id]['node_comps']
+
+        new_covs = self.fuse_covs(node_id, how='arith')
+        new_states = self.fuse_states(node_id, how='arith')
+        new_alphas = self.fuse_alphas(node_id, new_covs, new_states, how='arith')
+
+        fused_comps = []
+        for i in range(len(new_alphas)):
+            f = Target(init_weight=new_alphas[i],
+                       init_state=new_states[i],
+                       init_cov=new_covs[i],
+                       dt_1=node_comps[i].dt_1,
+                       dt_2=node_comps[i].dt_2)
+            fused_comps.append(f)
+        return fused_comps
 
     # After fusing covs, states, and alphas the geometric way
     def fuse_comps_geom(self, node_id):
+        node_comps = self.node_share[node_id]['node_comps']
+
         new_covs = self.fuse_covs(node_id)
         new_states = self.fuse_states(node_id)
         new_alphas = self.fuse_alphas(node_id, new_covs, new_states)
@@ -125,11 +141,13 @@ class PHDFilterNetwork:
         for i in range(len(new_alphas)):
             f = Target(init_weight=new_alphas[i],
                        init_state=new_states[i],
-                       init_cov=new_covs[i])
+                       init_cov=new_covs[i],
+                       dt_1=node_comps[i].dt_1,
+                       dt_2=node_comps[i].dt_2)
             fused_comps.append(f)
         return fused_comps
 
-    def fuse_covs(self, node_id):
+    def fuse_covs(self, node_id, how='geom'):
         # Use self.node_keep to fuse only the closest components among all neighbors
         # If no close components skip fusion for this component
 
@@ -144,19 +162,28 @@ class PHDFilterNetwork:
                 new_covs.append(node_comps[i].state_cov)
                 continue
 
-            comp_cov_inv = np.linalg.inv(node_comps[i].state_cov)
-            sum_covs = weight * comp_cov_inv
+            if how == 'geom':
+                comp_cov_inv = np.linalg.inv(node_comps[i].state_cov)
+                sum_covs = weight * comp_cov_inv
+            else:
+                sum_covs = weight * node_comps[i].state_cov
 
             for c in closest_neighbor_comps[i]:
                 n_weight = c[0]
                 n_comp = c[1]
-                n_comp_cov_inv = np.linalg.inv(n_comp.state_cov)
-                sum_covs += n_weight * n_comp_cov_inv
-            new_covs.append(np.linalg.inv(sum_covs))
+                if how == 'geom':
+                    n_comp_cov_inv = np.linalg.inv(n_comp.state_cov)
+                    sum_covs += n_weight * n_comp_cov_inv
+                else:
+                    sum_covs += n_weight * n_comp.state_cov
+            if how == 'geom':
+                new_covs.append(np.linalg.inv(sum_covs))
+            else:
+                new_covs.append(sum_covs)
 
         return new_covs
 
-    def fuse_states(self, node_id):
+    def fuse_states(self, node_id, how='geom'):
         # Use self.node_keep to fuse only the closest components among all neighbors
         # If no close components skip fusion for this component
 
@@ -172,21 +199,32 @@ class PHDFilterNetwork:
                 continue
 
             comp_state = node_comps[i].state
-            comp_cov_inv = np.linalg.inv(node_comps[i].state_cov)
-            sum_states = weight * np.dot(comp_cov_inv, comp_state)
+            if how == 'geom':
+                comp_cov_inv = np.linalg.inv(node_comps[i].state_cov)
+                sum_states = weight * np.dot(comp_cov_inv, comp_state)
+            else:
+                sum_states = weight * comp_state
+                sum_weights = weight
 
             for c in closest_neighbor_comps[i]:
                 n_weight = c[0]
                 n_comp = c[1]
                 n_comp_state = n_comp.state
-                n_comp_cov_inv = np.linalg.inv(n_comp.state_cov)
-                sum_states += n_weight * np.dot(n_comp_cov_inv, n_comp_state)
-            new_states.append(sum_states)
+                if how == 'geom':
+                    n_comp_cov_inv = np.linalg.inv(n_comp.state_cov)
+                    sum_states += n_weight * np.dot(n_comp_cov_inv, n_comp_state)
+                else:
+                    sum_states += n_weight * n_comp_state
+                    sum_weights += n_weight
+            if how == 'geom':
+                new_states.append(sum_states)
+            else:
+                new_states.append(sum_states / float(sum_weights))
 
         return new_states
 
     # Fuse the component weights
-    def fuse_alphas(self, node_id, new_covs, new_states):
+    def fuse_alphas(self, node_id, new_covs, new_states, how='geom'):
         # Use self.node_keep to fuse only the closest components among all neighbors
         # If no close components skip fusion for this component
 
@@ -201,21 +239,30 @@ class PHDFilterNetwork:
                 new_alphas.append(node_comps[i].weight)
                 continue
 
-            all_comps = [(weight, node_comps[i])] + closest_neighbor_comps[i]
-            K = self.calcK(i, all_comps, new_covs, new_states)
             comp_alpha = node_comps[i].weight
-            comp_cov = node_comps[i].state_cov
-            rescaler = self.rescaler(comp_cov, weight)
-            prod_alpha = comp_alpha ** weight * rescaler * K
+            if how == 'geom':
+                all_comps = [(weight, node_comps[i])] + closest_neighbor_comps[i]
+                K = self.calcK(i, all_comps, new_covs, new_states)
+                comp_cov = node_comps[i].state_cov
+                rescaler = self.rescaler(comp_cov, weight)
+                prod_alpha = comp_alpha ** weight * rescaler * K
+            else:
+                sum_alpha = comp_alpha
 
             for c in closest_neighbor_comps[i]:
                 n_weight = c[0]
                 n_comp = c[1]
                 n_comp_alpha = n_comp.weight
-                n_comp_cov = n_comp.state_cov
-                rescaler = self.rescaler(n_comp_cov, n_weight)
-                prod_alpha *= n_comp_alpha ** n_weight * rescaler * K
-            new_alphas.append(prod_alpha)
+                if how == 'geom':
+                    n_comp_cov = n_comp.state_cov
+                    rescaler = self.rescaler(n_comp_cov, n_weight)
+                    prod_alpha *= n_comp_alpha ** n_weight * rescaler * K
+                else:
+                    sum_alpha += n_comp_alpha
+            if how == 'geom':
+                new_alphas.append(prod_alpha)
+            else:
+                new_alphas.append(sum_alpha)
 
         return new_alphas
 

@@ -43,7 +43,7 @@ class SimGenerator:
             current_pos = target.state
             x = current_pos[0, 0]
             y = current_pos[1, 0]
-            s = np.random.random()
+            s = np.random.rand()
             if s > self.survival_prob \
                     or x < self.region[0][0] or x > self.region[0][1] \
                     or y < self.region[1][0] or y > self.region[1][1]:

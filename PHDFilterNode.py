@@ -84,8 +84,8 @@ class PHDFilterNode:
                   for comp in self.predicted_targets]
 
         for m in measurements:
-            # TODO: also incorporate some randomness to detection of measurement
-            if self.check_measure_oob(m):
+            if self.check_measure_oob(m) or \
+                            np.random.rand() > self.detection_probability:
                 continue
             newgmmpartial = []
             weightsum = 0
@@ -128,6 +128,8 @@ class PHDFilterNode:
 
     def merge(self):
         weightsums = sum([comp.weight for comp in self.pruned_targets])
+        # if weightsums == 0:
+        #
         sourcegmm = [deepcopy(comp) for comp in self.pruned_targets]
         newgmm = []
 
@@ -189,13 +191,13 @@ class PHDFilterNode:
             comp.weight *= weightnorm
         self.merged_targets = newgmm
 
-    def plot(self, k, folder='results'):
+    def plot(self, k, folder='results', cardinality=None):
         # Plot Extracted States
 
         plt.xlim(self.region[0])
         plt.ylim(self.region[1])
 
-        x, y = self.extractstates()
+        x, y = self.extractstates(cardinality=cardinality)
         plt.scatter(x, y)
 
         # plt.legend()
