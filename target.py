@@ -9,11 +9,15 @@ class Target:
                  init_cov=np.diag((0.01, 0.01, 0.01, 0.01)),
                  process_noise=0.001,
                  step=3,
+                 dt_1=1,
+                 dt_2=1,
                  circle=False):
         self.state = init_state
         self.state_cov = init_cov
         self.weight = init_weight
         self.measure_cov = init_cov
+        self.dt_1 = dt_1
+        self.dt_2 = dt_2
 
         self.all_states = []
         self.all_states.append(init_state)
@@ -33,8 +37,8 @@ class Target:
         else:
             self.state[2][0] = step
             self.state[3][0] = step
-            self.A = np.array([[1, 0, 1, 0],
-                               [0, 1, 0, 1],
+            self.A = np.array([[1, 0, dt_1, 0],
+                               [0, 1, 0, dt_2],
                                [0, 0, 1, 0],
                                [0, 0, 0, 1]])
             self.B = np.eye(init_state.shape[0])

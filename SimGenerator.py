@@ -7,13 +7,17 @@ from target import Target
 class SimGenerator:
     def __init__(self,
                  clutter_lambda,
-                 birth_prob,
+                 birth_prob=0.2,
+                 birth_poisson_lambda=0.8,
+                 survival_prob=0.95,
                  timesteps=200,
                  init_targets=[],
                  region=[(-50, 50), (-50, 50)]):
 
         self.clutter_lambda = clutter_lambda
         self.birth_prob = birth_prob
+        self.birth_poisson_lambda = birth_poisson_lambda
+        self.survival_prob = survival_prob
         self.timesteps = timesteps
         self.init_targets = init_targets
         self.region = region
@@ -39,24 +43,60 @@ class SimGenerator:
             current_pos = target.state
             x = current_pos[0, 0]
             y = current_pos[1, 0]
-            # TODO: incorporate randomness to survival check as well
-            if x < self.region[0][0] or x > self.region[0][1] \
+            s = np.random.random()
+            if s > self.survival_prob \
+                    or x < self.region[0][0] or x > self.region[0][1] \
                     or y < self.region[1][0] or y > self.region[1][1]:
                 continue
             next_timestep_targets.append(target)
             true_positions.append(target.get_measurement())
 
         # Generate New Births
-        # TODO: change to poisson sampling and start birth and one of the 4 corners
-        x = np.random.random()
-        if x < self.birth_prob:
-            x = np.random.uniform(low=self.region[0][0],
-                                  high=self.region[0][1])
-            y = np.random.uniform(low=self.region[1][0],
-                                  high=self.region[1][1])
-            new_target = Target(init_state=np.array([[x], [y], [0.1], [0.0]]))
+        # Poisson Birth
+        num_birth = np.random.poisson(self.birth_poisson_lambda)
+        for i in range(num_birth):
+            corner = np.random.choice([0, 1, 2, 3])
+            if corner == 0:
+                new_target = Target(
+                    init_state=np.array([
+                        [self.region[0][0] + 10 * np.random.randn()],
+                        [self.region[1][0] + 10 * np.random.randn()],
+                        [0.1], [0.1]]))
+            elif corner == 1:
+                new_target = Target(
+                    init_state=np.array([
+                        [self.region[0][0] + 10 * np.random.randn()],
+                        [self.region[1][1] + 10 * np.random.randn()],
+                        [0.1], [0.1]]),
+                    dt_2=-1)
+            elif corner == 2:
+                new_target = Target(
+                    init_state=np.array(
+                        [[self.region[0][1] + 10 * np.random.randn()],
+                         [self.region[1][1] + 10 * np.random.randn()],
+                         [0.1], [0.1]]),
+                    dt_1=-1, dt_2=-1)
+            else:
+                new_target = Target(
+                    init_state=np.array(
+                        [[self.region[0][1] + 10 * np.random.randn()],
+                         [self.region[1][0] + 10 * np.random.randn()],
+                         [0.1], [0.1]]),
+                    dt_1=-1)
+
             next_timestep_targets.append(new_target)
             true_positions.append(new_target.get_measurement())
+
+        # Random Uniform Birth
+        # x = np.random.random()
+        # if x < self.birth_prob:
+        #     x = np.random.uniform(low=self.region[0][0],
+        #                           high=self.region[0][1])
+        #     y = np.random.uniform(low=self.region[1][0],
+        #                           high=self.region[1][1])
+        #     new_target = Target(init_state=np.array([[x], [y], [0.1], [0.0]]))
+        #     next_timestep_targets.append(new_target)
+        #     true_positions.append(new_target.get_measurement())
 
         num_clutter = np.random.poisson(5)
         for i in range(num_clutter):

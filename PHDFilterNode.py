@@ -3,6 +3,8 @@ import math
 import matplotlib.pyplot as plt
 import numpy as np
 from operator import attrgetter
+import scipy.stats as ss
+
 from target import Target
 
 
@@ -76,7 +78,9 @@ class PHDFilterNode:
 
         newgmm = [Target(init_weight=comp.weight * (1.0 - self.detection_probability),
                          init_state=comp.state,
-                         init_cov=comp.state_cov)
+                         init_cov=comp.state_cov,
+                         dt_1=comp.dt_1,
+                         dt_2=comp.dt_2)
                   for comp in self.predicted_targets]
 
         for m in measurements:
@@ -94,7 +98,9 @@ class PHDFilterNode:
                 newcomp_state_cov = comp.state_cov
                 newgmmpartial.append(Target(init_weight=newcomp_weight,
                                             init_state=newcomp_state,
-                                            init_cov=newcomp_state_cov))
+                                            init_cov=newcomp_state_cov,
+                                            dt_1=comp.dt_1,
+                                            dt_2=comp.dt_2))
                 weightsum += newcomp_weight
 
             # Scale Weights
@@ -151,6 +157,8 @@ class PHDFilterNode:
 
             # Create new component from subsumed components
             newcomp_weight = sum([comp.weight for comp in subsumed])
+            # newcomp_dt_1 = ss.mode([comp.dt_1 for comp in subsumed])[0][0]
+            # newcomp_dt_2 = ss.mode([comp.dt_2 for comp in subsumed])[0][0]
 
             newcomp_state = np.sum(
                 np.array([
@@ -166,7 +174,9 @@ class PHDFilterNode:
 
             newcomp = Target(init_weight=newcomp_weight,
                              init_state=newcomp_state,
-                             init_cov=newcomp_cov)
+                             init_cov=newcomp_cov,
+                             dt_1=weightiest.dt_1,
+                             dt_2=weightiest.dt_2)
 
             newgmm.append(newcomp)
 
@@ -211,7 +221,7 @@ class PHDFilterNode:
                 self.targets = self.merged_targets
                 self.plot(i, folder=folder)
 
-    def extractstates(self, cardinality=None, thresh=0.1):
+    def extractstates(self, cardinality=None, thresh=0.5):
         x = []
         y = []
         if cardinality is not None:
@@ -220,10 +230,11 @@ class PHDFilterNode:
             all_targets = self.targets
 
         for comp in all_targets:
-            if cardinality is None and comp.weight > thresh:
-                for _ in range(int(np.ceil(comp.weight))):
-                    x.append(comp.state[0][0])
-                    y.append(comp.state[1][0])
+            if cardinality is None:
+                if comp.weight > thresh:
+                    for _ in range(int(np.ceil(comp.weight))):
+                        x.append(comp.state[0][0])
+                        y.append(comp.state[1][0])
             else:
                 x.append(comp.state[0][0])
                 y.append(comp.state[0][0])
