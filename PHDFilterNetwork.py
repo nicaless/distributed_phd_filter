@@ -38,8 +38,8 @@ class PHDFilterNetwork:
 
             # self.cardinality_consensus()
 
-            for id, n in nodes.items():
-                self.reduce_comps(id)
+            # for id, n in nodes.items():
+            #     self.reduce_comps(id)
 
             for l in range(L):
                 for id, n in nodes.items():
@@ -116,6 +116,10 @@ class PHDFilterNetwork:
         self.node_keep[node_id] = keep_comps
 
     def update_comps(self, how='geom'):
+        # TODO: Collect all comps from all nodes.
+        # TODO: Update all nodes to have the same comps
+        # TODO: Have all nodes do prune and merge steps again
+
         for n in list(self.network.nodes()):
             if how == 'geom':
                 new_comps = self.fuse_comps_geom(n)
