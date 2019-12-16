@@ -8,7 +8,7 @@ class SimGenerator:
     def __init__(self,
                  clutter_lambda,
                  birth_prob=0.2,
-                 birth_poisson_lambda=0.8,
+                 birth_poisson_lambda=1,
                  survival_prob=0.95,
                  timesteps=200,
                  init_targets=[],
@@ -98,7 +98,9 @@ class SimGenerator:
         #     next_timestep_targets.append(new_target)
         #     true_positions.append(new_target.get_measurement())
 
-        num_clutter = np.random.poisson(5)
+        # num_clutter = np.random.poisson(self.clutter_lambda)
+        # TODO: move this to FilterNode object
+        num_clutter = self.clutter_lambda
         for i in range(num_clutter):
             x = np.random.uniform(low=self.region[0][0],
                                   high=self.region[0][1])

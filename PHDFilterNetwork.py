@@ -3,7 +3,6 @@ import networkx as nx
 import numpy as np
 from operator import attrgetter
 
-from PHDFilterNode import dmvnorm
 from target import Target
 
 
@@ -24,24 +23,36 @@ class PHDFilterNetwork:
         self.cardinality = 0
         self.node_keep = {}
 
-    def step_through(self, measurements, L=1, how='geom', folder='results'):
+        # TRACKERS
+        self.adjacencies = {}
+        self.weighted_adjacencies = {}
+
+    def step_through(self, measurements, L=1, how='geom', folder='results',
+                     plot=False):
         nodes = nx.get_node_attributes(self.network, 'node')
         if not isinstance(measurements, dict):
             measurements = {0: measurements}
         for i, m in measurements.items():
             for id, n in nodes.items():
                 n.step_through(m, i, folder='{f}/{id}'.format(f=folder, id=id))
-            self.cardinality_consensus()
+
+            # self.cardinality_consensus()
+
             for id, n in nodes.items():
                 self.reduce_comps(id)
+
             for l in range(L):
                 for id, n in nodes.items():
                     self.share_info(id)
                     self.get_closest_comps(id)
                 self.update_comps(how=how)
-            for id, n in nodes.items():
-                n.plot(i, folder='{f}/{id}_fuse'.format(f=folder, id=id),
-                       cardinality=self.cardinality)
+
+            #TODO: update TRACKERS
+
+            if plot:
+                for id, n in nodes.items():
+                    n.plot(i, folder='{f}/{id}_fuse'.format(f=folder, id=id),
+                           cardinality=self.cardinality)
 
     def cardinality_consensus(self):
         nodes = nx.get_node_attributes(self.network, 'node')
@@ -49,13 +60,16 @@ class PHDFilterNetwork:
         weight_sum = 0
         for n in list(self.network.nodes()):
             est = sum([t.weight for t in nodes[n].targets])
-            weight_sum += est * weights[n]
-        self.cardinality = int(np.ceil(weight_sum / float(len(nodes))))
+            # weight_sum += est * weights[n]
+            weight_sum += est
+        # self.cardinality = int(np.ceil(weight_sum / float(len(nodes))))
+        self.cardinality = int(np.ceil(weight_sum))
 
     def reduce_comps(self, node_id):
         node = nx.get_node_attributes(self.network, 'node')[node_id]
         node_comps = node.targets
-        keep_node_comps = node_comps[:self.cardinality]
+        # keep_node_comps = node_comps[:self.cardinality]
+        keep_node_comps = [comp for comp in node_comps if comp.weight > 0.1]
         node.targets = keep_node_comps
 
     def share_info(self, node_id):
@@ -74,6 +88,7 @@ class PHDFilterNetwork:
     def get_closest_comps(self, node_id):
         node_comps = self.node_share[node_id]['node_comps']
         neighbor_comps = self.node_share[node_id]['neighbor_comps']
+        merge_thresh = nx.get_node_attributes(self.network, 'node')[node_id].merge_thresh
 
         keep_comps = {}
         for i in range(len(node_comps)):
@@ -82,7 +97,7 @@ class PHDFilterNetwork:
             x_cov = node_comps[i].state_cov
             for neighbor, n_comps in neighbor_comps.items():
                 y_weight = nx.get_node_attributes(self.network, 'weights')[neighbor]
-                d = 10
+                d = merge_thresh
                 current_closest = None
                 for neighbor_comp in n_comps:
                     y_state = neighbor_comp.state
@@ -93,9 +108,10 @@ class PHDFilterNetwork:
                                        y_state[1][0] - x_state[1][0])
                     if new_d < d:
                         current_closest = neighbor_comp
-                        d = new_d
-                if current_closest is not None:
-                    keep_comps[i].append((y_weight, current_closest))
+                        # d = new_d
+                        keep_comps[i].append((y_weight, current_closest))
+                # if current_closest is not None:
+                #     keep_comps[i].append((y_weight, current_closest))
 
         self.node_keep[node_id] = keep_comps
 
@@ -113,7 +129,7 @@ class PHDFilterNetwork:
         node_comps = self.node_share[node_id]['node_comps']
 
         new_covs = self.fuse_covs(node_id, how='arith')
-        new_states = self.fuse_states(node_id, how='arith')
+        new_states, did_fuse = self.fuse_states(node_id, how='arith')
         new_alphas = self.fuse_alphas(node_id, new_covs, new_states, how='arith')
 
         fused_comps = []
@@ -131,11 +147,12 @@ class PHDFilterNetwork:
         node_comps = self.node_share[node_id]['node_comps']
 
         new_covs = self.fuse_covs(node_id)
-        new_states = self.fuse_states(node_id)
+        new_states, did_fuse = self.fuse_states(node_id)
         new_alphas = self.fuse_alphas(node_id, new_covs, new_states)
         for i in range(len(new_states)):
-            n = np.dot(new_covs[i], new_states[i])
-            new_states[i] = n
+            if did_fuse[i] == 1:
+                n = np.dot(new_covs[i], new_states[i])
+                new_states[i] = n
 
         fused_comps = []
         for i in range(len(new_alphas)):
@@ -193,11 +210,14 @@ class PHDFilterNetwork:
         weight = nx.get_node_attributes(self.network, 'weights')[node_id]
 
         new_states = []
+        did_fuse = []
         for i in range(len(node_comps)):
             if len(closest_neighbor_comps[i]) == 0:
                 new_states.append(node_comps[i].state)
+                did_fuse.append(0)
                 continue
 
+            did_fuse.append(1)
             comp_state = node_comps[i].state
             if how == 'geom':
                 comp_cov_inv = np.linalg.inv(node_comps[i].state_cov)
@@ -221,7 +241,7 @@ class PHDFilterNetwork:
             else:
                 new_states.append(sum_states / float(sum_weights))
 
-        return new_states
+        return new_states, did_fuse
 
     # Fuse the component weights
     def fuse_alphas(self, node_id, new_covs, new_states, how='geom'):
