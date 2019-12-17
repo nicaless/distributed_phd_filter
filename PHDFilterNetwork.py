@@ -1,3 +1,4 @@
+from copy import deepcopy
 import math
 import networkx as nx
 import numpy as np
@@ -36,10 +37,10 @@ class PHDFilterNetwork:
             for id, n in nodes.items():
                 n.step_through(m, i, folder='{f}/{id}'.format(f=folder, id=id))
 
-            # self.cardinality_consensus()
+            self.cardinality_consensus()
 
-            # for id, n in nodes.items():
-            #     self.reduce_comps(id)
+            for id, n in nodes.items():
+                self.reduce_comps(id)
 
             for l in range(L):
                 for id, n in nodes.items():
@@ -47,7 +48,11 @@ class PHDFilterNetwork:
                     self.get_closest_comps(id)
                 self.update_comps(how=how)
 
-            #TODO: update TRACKERS
+            for id, n in nodes.items():
+                n.update_trackers(i, pre_consensus=False)
+
+            self.adjacencies[i] = self.adjacency_matrix()
+            self.weighted_adjacencies[i] = self.weighted_adjacency_matrix()
 
             if plot:
                 for id, n in nodes.items():
@@ -68,8 +73,9 @@ class PHDFilterNetwork:
     def reduce_comps(self, node_id):
         node = nx.get_node_attributes(self.network, 'node')[node_id]
         node_comps = node.targets
-        # keep_node_comps = node_comps[:self.cardinality]
-        keep_node_comps = [comp for comp in node_comps if comp.weight > 0.1]
+        limit = min(self.cardinality, node.max_components)
+        keep_node_comps = node_comps[:limit]
+        # keep_node_comps = [comp for comp in node_comps if comp.weight > 0.1]
         node.targets = keep_node_comps
 
     def share_info(self, node_id):
@@ -116,18 +122,23 @@ class PHDFilterNetwork:
         self.node_keep[node_id] = keep_comps
 
     def update_comps(self, how='geom'):
-        # TODO: Collect all comps from all nodes.
-        # TODO: Update all nodes to have the same comps
-        # TODO: Have all nodes do prune and merge steps again
-
+        all_comps = []
         for n in list(self.network.nodes()):
             if how == 'geom':
                 new_comps = self.fuse_comps_geom(n)
             else:
                 new_comps = self.fuse_comps_arith(n)
-            node = nx.get_node_attributes(self.network, 'node')[n]
             new_comps.sort(key=attrgetter('weight'), reverse=True)
+            # all_comps.extend(new_comps)
+            node = nx.get_node_attributes(self.network, 'node')[n]
             node.targets = new_comps
+
+        # for n in list(self.network.nodes()):
+        #     node = nx.get_node_attributes(self.network, 'node')[n]
+        #     node.updated_targets = [deepcopy(t) for t in all_comps]
+        #     node.prune()
+        #     node.merge()
+        #     node.targets = node.merged_targets
 
     def fuse_comps_arith(self, node_id):
         node_comps = self.node_share[node_id]['node_comps']
@@ -325,6 +336,28 @@ class PHDFilterNetwork:
         numer = np.linalg.det(2 * np.pi * np.linalg.inv(cov / weight))
         denom = np.linalg.det(2 * np.pi * cov) ** weight
         return (numer / denom) ** 0.5
+
+    def adjacency_matrix(self):
+        G = self.network
+        num_nodes = len(list(G.nodes()))
+
+        A = nx.adjacency_matrix(G).todense()
+        if not np.array_equal(np.diag(A), np.ones(num_nodes)):
+            A = A + np.diag(np.ones(num_nodes))
+        return A
+
+    def weighted_adjacency_matrix(self):
+        A = self.adjacency_matrix()
+        G = self.network
+
+        for n in list(G.nodes()):
+            weights = nx.get_node_attributes(G, 'weights')
+            A[n, n] = weights[n]
+            for i, neighbor in enumerate(list(G.neighbors(n))):
+                A[n, neighbor] = weights[neighbor]
+
+        return A
+
 
 
 

@@ -46,7 +46,8 @@ class Target:
 
         self.Q = np.eye(init_state.shape[0])
 
-        self.H = np.array([[1, 0, 0, 0], [0, 1, 0, 0]])
+        # self.H = np.array([[1, 0, 0, 0], [0, 1, 0, 0]])
+        self.H = np.array([[1, 0, 1, 0], [0, 1, 0, 1]])
         self.R = np.eye(2)
 
         self.process_noise = process_noise

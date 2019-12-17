@@ -21,14 +21,14 @@ class PHDFilterNode:
                  ):
         self.node_id = node_id
 
+        self.region = region
+        area = (region[0][1] - region[0][0]) * (region[1][1] - region[1][0])
+        self.clutter_intensity = clutter_rate / area
+
         self.birthgmm = birthgmm
         self.prune_thresh = prune_thresh
         self.merge_thresh = merge_thresh
         self.max_components = max_comp
-
-        self.region = region
-        area = (region[0][1] - region[0][0]) * (region[1][1] - region[1][0])
-        self.clutter_intensity = clutter_rate / area
 
         self.survival_prob = 0.98
         self.detection_probability = 0.95
@@ -41,6 +41,7 @@ class PHDFilterNode:
         self.predicted_targets = []
 
         # update results
+        self.measurements = []
         self.updated_targets = []
 
         # pruned results
@@ -51,11 +52,14 @@ class PHDFilterNode:
 
         # TRACKERS
         self.observations = {}
-        self.positions = {}
-        self.target_covs = {}
+        self.node_positions = {}
         self.detection_probs = {}
+
         self.preconsensus_positions = {}
+        self.preconsensus_target_covs = {}
+
         self.consensus_positions = {}
+        self.consensus_target_covs = {}
 
     def predict(self):
         # Existing Targets
@@ -63,22 +67,30 @@ class PHDFilterNode:
         for t in updated:
             t.next_state()
             t.weight = t.weight * self.survival_prob
+        keep_updated = [t for t in updated
+                        if not self.check_measure_oob(t.state)]
 
         # new born targets
         born = [deepcopy(t) for t in self.birthgmm
                 if not self.check_measure_oob(t.state)]
+        for b in born:
+            b.weight = b.weight / float(len(born))
 
-        all_targets = updated + born
+        all_targets = keep_updated + born
         predicted_pos = []
         for p in all_targets:
             predicted_pos.append(p.get_measurement())
 
-        # TODO: uniformly add clutter to measurements
-
         self.predicted_pos = predicted_pos
         self.predicted_targets = all_targets
 
+    def add_clutter(self):
+        pass
+
     def update(self, measurements):
+        # TODO: Add clutter to measurements
+        self.measurements = measurements
+
         # Create Update Components
         nu = self.predicted_pos  # expected observation from prediction
         s = [t.measure_cov for t in self.predicted_targets]  # cov of expected observation from prediction
@@ -114,7 +126,8 @@ class PHDFilterNode:
                                             init_state=newcomp_state,
                                             init_cov=newcomp_state_cov,
                                             dt_1=comp.dt_1,
-                                            dt_2=comp.dt_2))
+                                            dt_2=comp.dt_2
+                                            ))
                 weightsum += newcomp_weight
 
             # Scale Weights
@@ -198,9 +211,10 @@ class PHDFilterNode:
         newgmm.sort(key=attrgetter('weight'), reverse=True)
         self.merged_targets = newgmm[:self.max_components]
         newweightsum = sum([comp.weight for comp in self.merged_targets])
-        weightnorm = float(weightsums) / newweightsum
-        for comp in newgmm:
-            comp.weight *= weightnorm
+        if newweightsum > 0:
+            weightnorm = float(weightsums) / newweightsum
+            for comp in newgmm:
+                comp.weight *= weightnorm
         self.merged_targets = newgmm
 
     def plot(self, k, folder='results', cardinality=None):
@@ -218,14 +232,14 @@ class PHDFilterNode:
 
     # TODO: add a reset
     def step_through(self, measurements, measurement_id=0,
-                     pre_consensus=True, folder='results', plot=False):
+                     folder='results', plot=False):
         if not isinstance(measurements, dict):
             self.predict()
             self.update(measurements)
             self.prune()
             self.merge()
             self.targets = self.merged_targets
-            # TODO: UPDATE TRACKERS
+            self.update_trackers(measurement_id)
             if plot:
                 self.plot(measurement_id, folder=folder)
 
@@ -236,9 +250,30 @@ class PHDFilterNode:
                 self.prune()
                 self.merge()
                 self.targets = self.merged_targets
-                # TODO: UPDATE TRACKERS
+                self.update_trackers(i)
                 if plot:
                     self.plot(i, folder=folder)
+
+    def update_trackers(self, i, pre_consensus=True):
+        if pre_consensus:
+            self.observations[i] = self.measurements
+            self.node_positions[i] = self.position
+            self.detection_probs[i] = self.detection_probability
+
+            self.preconsensus_positions[i] = [np.array([[t.state[0][0]],
+                                                        [t.state[1][0]]])
+                                              for t in self.targets
+                                              if t.weight > 0.1]
+            self.preconsensus_target_covs[i] = [t.state_cov
+                                                for t in self.targets
+                                                if t.weight > 0.1]
+        else:
+            self.consensus_positions[i] = [np.array([[t.state[0][0]],
+                                                     [t.state[1][0]]])
+                                           for t in self.targets
+                                           if t.weight > 0.1]
+            self.consensus_target_covs[i] = [t.state_cov for t in self.targets
+                                             if t.weight > 0.1]
 
     def extractstates(self, cardinality=None, thresh=0.1):
         x = []

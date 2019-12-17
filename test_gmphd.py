@@ -136,7 +136,7 @@ class GMPHDTest(TestCase):
     #     print(y)
 
     def test_node_step_through(self):
-        self.filternode.step_through(self.generator.observations)
+        self.filternode.step_through(self.generator.observations, plot=True)
         print(sum([t.weight for t in self.filternode.targets]))
 
 

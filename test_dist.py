@@ -46,20 +46,20 @@ class GMPHDTest(TestCase):
                                 dt_1=0, dt_2=0)
                 self.birthgmm_3.append(target)
 
-        self.filternode_1 = PHDFilterNode(1, self.birthgmm_1,
+        self.filternode_1 = PHDFilterNode(0, self.birthgmm_1,
                                           region=[(-50, 0), (-50, 50)])
-        self.filternode_2 = PHDFilterNode(2, self.birthgmm_2,
+        self.filternode_2 = PHDFilterNode(1, self.birthgmm_2,
                                           region=[(-25, 25), (-50, 50)])
-        self.filternode_3 = PHDFilterNode(3, self.birthgmm_3,
+        self.filternode_3 = PHDFilterNode(2, self.birthgmm_3,
                                           region=[(0, 50), (-50, 50)])
 
         self.G = nx.Graph()
-        for i in range(1, 3):
+        for i in range(0, 2):
             self.G.add_edge(i, i + 1)
-        node_attrs = {1: self.filternode_1,
-                      2: self.filternode_2,
-                      3: self.filternode_3}
-        weight_attrs = {1: 1.0/3, 2: 1.0/3, 3: 1.0/3}
+        node_attrs = {0: self.filternode_1,
+                      1: self.filternode_2,
+                      2: self.filternode_3}
+        weight_attrs = {0: 1.0/3, 1: 1.0/3, 2: 1.0/3}
 
         self.filternetwork = PHDFilterNetwork(node_attrs,
                                               weight_attrs,
@@ -77,7 +77,14 @@ class GMPHDTest(TestCase):
     #     self.filternetwork.step_through(self.generator.observations[0])
 
     def test_step_through(self):
-        self.filternetwork.step_through(self.generator.observations)
+        self.filternetwork.step_through(self.generator.observations, plot=True)
+        print([t.weight for t in self.filternode_2.targets])
+        print([(t.state[0][0], t.state[1][0]) for t in self.filternode_2.targets])
+        print(len(self.filternode_2.targets))
+
+        print([t.weight for t in self.filternode_1.targets])
+        print([(t.state[0][0], t.state[1][0]) for t in self.filternode_1.targets])
+        print(len(self.filternode_1.targets))
 
     # def test_step_through_arith(self):
     #     self.filternetwork.step_through(self.generator.observations,
