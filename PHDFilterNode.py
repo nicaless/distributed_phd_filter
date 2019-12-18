@@ -1,9 +1,7 @@
 from copy import deepcopy
 import math
-import matplotlib.pyplot as plt
 import numpy as np
 from operator import attrgetter
-import scipy.stats as ss
 
 from target import Target
 
@@ -17,12 +15,14 @@ class PHDFilterNode:
                  max_comp=100,
                  # clutter_rate=5,
                  clutter_rate=0,
-                 position=(0, 0),
+                 position=np.array([0, 0, 0]),
                  region=[(-50, 50), (-50, 50)]
                  ):
         self.node_id = node_id
 
+        self.position = position
         self.region = region
+        self.fov = (region[0][1] - region[0][0]) / 2.0
         area = (region[0][1] - region[0][0]) * (region[1][1] - region[1][0])
         self.clutter_intensity = clutter_rate / area
 
@@ -34,7 +34,6 @@ class PHDFilterNode:
         self.survival_prob = 0.98
         self.detection_probability = 0.95
 
-        self.position = position
         self.targets = []
 
         # prediction results
@@ -61,6 +60,13 @@ class PHDFilterNode:
 
         self.consensus_positions = {}
         self.consensus_target_covs = {}
+
+    def update_position(self, new_position):
+        self.position = new_position
+        x = new_position[0]
+        y = new_position[1]
+        self.region = [(x - self.fov, x + self.fov),
+                       (y - self.fov, y + self.fov)]
 
     def predict(self):
         # Existing Targets

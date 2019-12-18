@@ -1,9 +1,9 @@
-from copy import deepcopy
 import math
 import networkx as nx
 import numpy as np
 from operator import attrgetter
 
+from reconfig_utils import *
 from target import Target
 
 
@@ -32,7 +32,12 @@ class PHDFilterNetwork:
         nodes = nx.get_node_attributes(self.network, 'node')
         if not isinstance(measurements, dict):
             measurements = {0: measurements}
+        failure = False
         for i, m in measurements.items():
+            # TODO: Apply Failure Event
+            if i == 10:
+                failure = True
+
             for id, n in nodes.items():
                 n.step_through(m, i)
 
@@ -46,6 +51,23 @@ class PHDFilterNetwork:
                     self.share_info(id)
                     self.get_closest_comps(id)
                 self.update_comps(how=how)
+
+            # TODO: Apply Optimization and Update Position
+            if failure:
+                A = self.adjacency_matrix()
+                current_coords = {nid: n.position for nid, n in nodes.items()}
+                fov = {nid: n.fov for nid, n in nodes.items()}
+
+                # TODO: Apply Optimization
+                A[0, 2] = 1
+                A[2, 0] = 1
+                top_phd = nodes[0].targets[0].state
+                centroid = np.array([[top_phd[0][0]], [top_phd[1][0]]])
+
+                new_coords = generate_coords(A, current_coords, fov, centroid)
+                for id, n in nodes.items():
+                    n.update_position(new_coords[id])
+                failure = False
 
             for id, n in nodes.items():
                 n.update_trackers(i, pre_consensus=False)

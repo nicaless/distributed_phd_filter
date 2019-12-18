@@ -32,13 +32,13 @@ Create Nodes
 """
 
 filternode_1 = PHDFilterNode(0, birthgmm,
-                             position=(-25, 0),
+                             position=np.array([-25, 0, 20]),
                              region=[(-45, -5), (-20, 20)])
 filternode_2 = PHDFilterNode(1, birthgmm,
-                             position=(0, 0),
+                             position=np.array([0, 0, 20]),
                              region=[(-20, 20), (-20, 20)])
 filternode_3 = PHDFilterNode(2, birthgmm,
-                             position=(25, 0),
+                             position=np.array([25, 0, 20]),
                              region=[(5, 45), (-20, 20)])
 
 """
@@ -83,8 +83,9 @@ for i, targets in generator.observations.items():
     y = []
     all_nodes = nx.get_node_attributes(filternetwork.network, 'node')
     for n, node in all_nodes.items():
-        pos = node.position
-        radius = (node.region[0][1] - node.region[0][0]) / 2.0
+        # pos = node.position
+        pos = node.node_positions[i]
+        radius = node.fov
         p = plt.Circle(pos, radius, alpha=0.2, color='blue')
         ax.add_patch(p)
 
