@@ -61,28 +61,6 @@ Run Simulation
 """
 filternetwork.step_through(generator.observations, how='arith')
 
-# print('done')
-# print(nx.adjacency_matrix(G).todense())
-# print(len(filternetwork.adjacencies))
-# print(filternetwork.adjacencies[49])
-# print(filternetwork.weighted_adjacencies[49])
-#
-# for n in [filternode_1, filternode_2, filternode_3]:
-#     print(n)
-#     print(len(n.observations))
-#     print(len(n.node_positions))
-#     print(len(n.detection_probs))
-#
-#     print(len(n.preconsensus_positions))
-#     print(len(n.preconsensus_target_covs))
-#
-#     print(len(n.consensus_positions))
-#     print(len(n.consensus_target_covs))
-#
-#     print(n.consensus_positions[49])
-#
-# print(generator.observations[49])
-
 """
 Plot
 """

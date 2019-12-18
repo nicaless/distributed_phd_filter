@@ -15,7 +15,8 @@ class PHDFilterNode:
                  prune_thresh=1e-6,
                  merge_thresh=5,
                  max_comp=100,
-                 clutter_rate=5,
+                 # clutter_rate=5,
+                 clutter_rate=0,
                  position=(0, 0),
                  region=[(-50, 50), (-50, 50)]
                  ):
@@ -262,18 +263,14 @@ class PHDFilterNode:
 
             self.preconsensus_positions[i] = [np.array([[t.state[0][0]],
                                                         [t.state[1][0]]])
-                                              for t in self.targets
-                                              if t.weight > 0.1]
+                                              for t in self.targets]
             self.preconsensus_target_covs[i] = [t.state_cov
-                                                for t in self.targets
-                                                if t.weight > 0.1]
+                                                for t in self.targets]
         else:
             self.consensus_positions[i] = [np.array([[t.state[0][0]],
                                                      [t.state[1][0]]])
-                                           for t in self.targets
-                                           if t.weight > 0.1]
-            self.consensus_target_covs[i] = [t.state_cov for t in self.targets
-                                             if t.weight > 0.1]
+                                           for t in self.targets]
+            self.consensus_target_covs[i] = [t.state_cov for t in self.targets]
 
     def extractstates(self, cardinality=None, thresh=0.1):
         x = []

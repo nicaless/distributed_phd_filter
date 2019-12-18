@@ -62,20 +62,26 @@ class PHDFilterNetwork:
     def cardinality_consensus(self):
         nodes = nx.get_node_attributes(self.network, 'node')
         weights = nx.get_node_attributes(self.network, 'weights')
-        weight_sum = 0
+
+        weighted_est = 0
+        tot_est = []
         for n in list(self.network.nodes()):
             est = sum([t.weight for t in nodes[n].targets])
-            # weight_sum += est * weights[n]
-            weight_sum += est
-        # self.cardinality = int(np.ceil(weight_sum / float(len(nodes))))
-        self.cardinality = int(np.ceil(weight_sum))
+            weighted_est += est * weights[n]
+            tot_est.append(est)
+
+        # Rescale Weights using total weighted estimate
+        for n in list(self.network.nodes()):
+            for t in nodes[n].targets:
+                t.weight = np.ceil(weighted_est) / tot_est[n]
+
+        self.cardinality = int(np.ceil(weighted_est))
 
     def reduce_comps(self, node_id):
         node = nx.get_node_attributes(self.network, 'node')[node_id]
         node_comps = node.targets
         limit = min(self.cardinality, node.max_components)
         keep_node_comps = node_comps[:limit]
-        # keep_node_comps = [comp for comp in node_comps if comp.weight > 0.1]
         node.targets = keep_node_comps
 
     def share_info(self, node_id):
@@ -104,7 +110,6 @@ class PHDFilterNetwork:
             for neighbor, n_comps in neighbor_comps.items():
                 y_weight = nx.get_node_attributes(self.network, 'weights')[neighbor]
                 d = merge_thresh
-                current_closest = None
                 for neighbor_comp in n_comps:
                     y_state = neighbor_comp.state
                     # new_d = float(np.dot(np.dot((x_state - y_state).T,
@@ -114,31 +119,24 @@ class PHDFilterNetwork:
                                        y_state[1][0] - x_state[1][0])
                     if new_d < d:
                         current_closest = neighbor_comp
-                        # d = new_d
                         keep_comps[i].append((y_weight, current_closest))
-                # if current_closest is not None:
-                #     keep_comps[i].append((y_weight, current_closest))
 
         self.node_keep[node_id] = keep_comps
 
     def update_comps(self, how='geom'):
-        all_comps = []
         for n in list(self.network.nodes()):
             if how == 'geom':
                 new_comps = self.fuse_comps_geom(n)
             else:
                 new_comps = self.fuse_comps_arith(n)
             new_comps.sort(key=attrgetter('weight'), reverse=True)
-            # all_comps.extend(new_comps)
             node = nx.get_node_attributes(self.network, 'node')[n]
-            node.targets = new_comps
+            # node.targets = new_comps
 
-        # for n in list(self.network.nodes()):
-        #     node = nx.get_node_attributes(self.network, 'node')[n]
-        #     node.updated_targets = [deepcopy(t) for t in all_comps]
-        #     node.prune()
-        #     node.merge()
-        #     node.targets = node.merged_targets
+            node.updated_targets = new_comps
+            node.prune()
+            node.merge()
+            node.targets = node.merged_targets
 
     def fuse_comps_arith(self, node_id):
         node_comps = self.node_share[node_id]['node_comps']
