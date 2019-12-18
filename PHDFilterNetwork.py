@@ -28,14 +28,13 @@ class PHDFilterNetwork:
         self.adjacencies = {}
         self.weighted_adjacencies = {}
 
-    def step_through(self, measurements, L=1, how='geom', folder='results',
-                     plot=False):
+    def step_through(self, measurements, L=1, how='geom'):
         nodes = nx.get_node_attributes(self.network, 'node')
         if not isinstance(measurements, dict):
             measurements = {0: measurements}
         for i, m in measurements.items():
             for id, n in nodes.items():
-                n.step_through(m, i, folder='{f}/{id}'.format(f=folder, id=id))
+                n.step_through(m, i)
 
             self.cardinality_consensus()
 
@@ -53,11 +52,6 @@ class PHDFilterNetwork:
 
             self.adjacencies[i] = self.adjacency_matrix()
             self.weighted_adjacencies[i] = self.weighted_adjacency_matrix()
-
-            if plot:
-                for id, n in nodes.items():
-                    n.plot(i, folder='{f}/{id}_fuse'.format(f=folder, id=id),
-                           cardinality=self.cardinality)
 
     def cardinality_consensus(self):
         nodes = nx.get_node_attributes(self.network, 'node')

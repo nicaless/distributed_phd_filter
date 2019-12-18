@@ -218,22 +218,8 @@ class PHDFilterNode:
                 comp.weight *= weightnorm
         self.merged_targets = newgmm
 
-    def plot(self, k, folder='results', cardinality=None):
-        # Plot Extracted States
-
-        plt.xlim(self.region[0])
-        plt.ylim(self.region[1])
-
-        x, y = self.extractstates(cardinality=cardinality)
-        plt.scatter(x, y)
-
-        # plt.legend()
-        plt.savefig('{folder}/{k}.png'.format(folder=folder, k=k))
-        plt.clf()
-
     # TODO: add a reset
-    def step_through(self, measurements, measurement_id=0,
-                     folder='results', plot=False):
+    def step_through(self, measurements, measurement_id=0):
         if not isinstance(measurements, dict):
             self.predict()
             self.update(measurements)
@@ -241,9 +227,6 @@ class PHDFilterNode:
             self.merge()
             self.targets = self.merged_targets
             self.update_trackers(measurement_id)
-            if plot:
-                self.plot(measurement_id, folder=folder)
-
         else:
             for i, m in measurements.items():
                 self.predict()
@@ -252,8 +235,6 @@ class PHDFilterNode:
                 self.merge()
                 self.targets = self.merged_targets
                 self.update_trackers(i)
-                if plot:
-                    self.plot(i, folder=folder)
 
     def update_trackers(self, i, pre_consensus=True):
         if pre_consensus:
@@ -271,30 +252,6 @@ class PHDFilterNode:
                                                      [t.state[1][0]]])
                                            for t in self.targets]
             self.consensus_target_covs[i] = [t.state_cov for t in self.targets]
-
-    def extractstates(self, cardinality=None, thresh=0.1):
-        x = []
-        y = []
-        if cardinality is not None:
-            # all_targets = self.targets[:cardinality]
-            all_targets = self.targets
-        else:
-            all_targets = self.targets
-
-        for comp in all_targets:
-            if comp.weight > thresh:
-                for _ in range(int(np.ceil(comp.weight))):
-                    x.append(comp.state[0][0])
-                    y.append(comp.state[1][0])
-            # if cardinality is None:
-            #     if comp.weight > thresh:
-            #         for _ in range(int(np.ceil(comp.weight))):
-            #             x.append(comp.state[0][0])
-            #             y.append(comp.state[1][0])
-            # else:
-            #     x.append(comp.state[0][0])
-            #     y.append(comp.state[0][0])
-        return x, y
 
 
 def dmvnorm(state, cov, obs):
