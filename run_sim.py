@@ -75,7 +75,7 @@ filternetwork.step_through(generator.observations,
                            how='arith')
 
 """
-Plot
+Plot Positions
 """
 
 for i, targets in generator.observations.items():
@@ -112,4 +112,22 @@ for i, targets in generator.observations.items():
     plt.savefig('test/{i}.png'.format(i=i))
     plt.clf()
 
+"""
+Plot Errors, Covariance
+"""
+time = []
+error = []
+max_trace_cov = []
+for t in generator.observations.keys():
+    time.append(t)
+    error.append(filternetwork.errors[t])
+    max_trace_cov.append(filternetwork.max_trace_cov[t])
 
+plt.plot(time, error, label='error')
+plt.legend()
+plt.savefig('test/_errors.png')
+plt.clf()
+plt.plot(time, max_trace_cov, label='max_tr_cov')
+plt.legend()
+plt.savefig('test/_max_tr_cov.png')
+plt.clf()

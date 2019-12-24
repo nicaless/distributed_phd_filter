@@ -28,6 +28,8 @@ class PHDFilterNetwork:
         # TRACKERS
         self.adjacencies = {}
         self.weighted_adjacencies = {}
+        self.errors = {}
+        self.max_trace_cov = {}
 
     def step_through(self, measurements, true_targets, L=1, how='geom', opt='agent'):
         nodes = nx.get_node_attributes(self.network, 'node')
@@ -53,20 +55,21 @@ class PHDFilterNetwork:
                     self.get_closest_comps(id)
                 self.update_comps(how=how)
 
+            covariance_trace = self.get_covariance_trace(true_targets[i],
+                                                         how=how)
             if failure:
                 A = self.adjacency_matrix()
                 current_coords = {nid: n.position for nid, n in nodes.items()}
                 fov = {nid: n.fov for nid, n in nodes.items()}
 
                 weights = nx.get_node_attributes(self.network, 'weights')
+
                 if opt == 'agent':
-                    covariance_data = self.get_covariance_trace(true_targets[i],
-                                                                how=how)
-                    A, new_weights = agent_opt(A, weights, covariance_data,
+                    A, new_weights = agent_opt(A, weights, covariance_trace,
                                                failed_node=0)
                 else:
                     # TODO: implement global optimization
-                    covariance_data = self.get_covariance_trace(true_targets[i])
+                    covariance_data = []
                     A, new_weights = agent_opt(A, weights, covariance_data,
                                                failed_node=0)
 
@@ -84,6 +87,8 @@ class PHDFilterNetwork:
             for id, n in nodes.items():
                 n.update_trackers(i, pre_consensus=False)
 
+            self.max_trace_cov[i] = max(covariance_trace)
+            self.errors[i] = self.calc_errors(true_targets[i])
             self.adjacencies[i] = self.adjacency_matrix()
             self.weighted_adjacencies[i] = self.weighted_adjacency_matrix()
 
@@ -477,6 +482,23 @@ class PHDFilterNetwork:
                 A[n, neighbor] = weights[n][neighbor]
 
         return A
+
+    def calc_errors(self, true_targets):
+        nodes = nx.get_node_attributes(self.network, 'node')
+
+        max_errors = []
+        for i, t in enumerate(true_targets):
+            errors = []
+            for n, node in nodes.items():
+                distances = [math.hypot(t[0] - comp.state[0][0],
+                                        t[1] - comp.state[1][0])
+                             for comp in node.targets]
+                errors.append(min(distances))
+            max_errors.append(max(errors))
+        return np.max(max_errors)
+
+
+
 
 
 
