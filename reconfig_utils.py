@@ -100,15 +100,16 @@ def energyCoverage(config, propose_coords, fov, target_estimate,
     sum_conn = 0
     sum_focus = 0
     bbox = bbox
+    sum_x = 0
+    sum_y = 0
 
     n = len(propose_coords)
     for i in range(n):
         pos = propose_coords[i]
         sum_box_node = 0
 
-        node_pos = np.array([[pos[0]], [pos[1]]])
-        dist_from_target = np.linalg.norm(node_pos - target_estimate)
-        sum_focus = sum_focus + ph(dist_from_target - fov[i], H)
+        sum_x += pos[0]
+        sum_y += pos[1]
 
         for d in range(len(bbox)):
             sum_box_node = sum_box_node + (ph(pos[d] - bbox[d, 1], H) +
@@ -128,8 +129,15 @@ def energyCoverage(config, propose_coords, fov, target_estimate,
             p = ((overlap ** 2) * np.pi) / 2
             coverage_penalties = coverage_penalties + p
 
+    # TODO: still congregating around the center, maybe double check with MATLAB code?
+    avg_x = sum_x / float(n)
+    avg_y = sum_y / float(n)
+    node_pos = np.array([[avg_x], [avg_y]])
+    dist_from_target = np.linalg.norm(node_pos - target_estimate)
+    sum_focus = ph(dist_from_target - fov[i], H)
+
     return (k * total_coverage) + coverage_penalties + \
-           sum_box + sum_safe + sum_conn + sum_focus
+           sum_box + sum_safe + sum_conn + (k * sum_focus)
 
 
 def isValidConfig(config, coords, safe_dist, connect_dist, bbox):

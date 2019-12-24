@@ -59,10 +59,11 @@ class PHDFilterNetwork:
                 fov = {nid: n.fov for nid, n in nodes.items()}
 
                 # TODO: Apply Optimization
+                # TODO: ensure order of Ps are close...
                 A[0, 2] = 1
                 A[2, 0] = 1
-                top_phd = nodes[0].targets[0].state
-                centroid = np.array([[top_phd[0][0]], [top_phd[1][0]]])
+
+                centroid = self.get_centroid()
 
                 new_coords = generate_coords(A, current_coords, fov, centroid)
                 for id, n in nodes.items():
@@ -74,6 +75,19 @@ class PHDFilterNetwork:
 
             self.adjacencies[i] = self.adjacency_matrix()
             self.weighted_adjacencies[i] = self.weighted_adjacency_matrix()
+
+    def get_centroid(self):
+        nodes = nx.get_node_attributes(self.network, 'node')
+        all_phd_states = []
+        for n, node in nodes.items():
+            for t in node.targets:
+                pos = np.array([[t.state[0][0]], [t.state[1][0]]])
+                all_phd_states.append(pos)
+
+        x, y = zip(*all_phd_states)
+        center_x = sum(x) / float(len(x))
+        center_y = sum(y) / float(len(x))
+        return np.array([[center_x], [center_y]])
 
     def cardinality_consensus(self):
         nodes = nx.get_node_attributes(self.network, 'node')
@@ -89,7 +103,9 @@ class PHDFilterNetwork:
         # Rescale Weights using total weighted estimate
         for n in list(self.network.nodes()):
             for t in nodes[n].targets:
-                t.weight = np.ceil(weighted_est) / tot_est[n]
+                # t.weight = np.ceil(weighted_est) / tot_est[n]
+                # TODO: check if this is correct
+                t.weight *= np.ceil(weighted_est) / tot_est[n]
 
         self.cardinality = int(np.ceil(weighted_est))
 
@@ -294,7 +310,8 @@ class PHDFilterNetwork:
                 K = self.calcK(i, all_comps, new_covs, new_states)
                 comp_cov = node_comps[i].state_cov
                 rescaler = self.rescaler(comp_cov, weight)
-                prod_alpha = comp_alpha ** weight * rescaler * K
+                # prod_alpha = comp_alpha ** weight * rescaler * K
+                prod_alpha = (comp_alpha ** weight) * rescaler
             else:
                 sum_alpha = comp_alpha
 
@@ -305,11 +322,12 @@ class PHDFilterNetwork:
                 if how == 'geom':
                     n_comp_cov = n_comp.state_cov
                     rescaler = self.rescaler(n_comp_cov, n_weight)
-                    prod_alpha *= n_comp_alpha ** n_weight * rescaler * K
+                    # prod_alpha *= n_comp_alpha ** n_weight * rescaler * K
+                    prod_alpha *= (n_comp_alpha ** n_weight) * rescaler
                 else:
                     sum_alpha += n_comp_alpha
             if how == 'geom':
-                new_alphas.append(prod_alpha)
+                new_alphas.append(prod_alpha * K)
             else:
                 new_alphas.append(sum_alpha)
 

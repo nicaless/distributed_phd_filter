@@ -20,8 +20,8 @@ generator.generate(50)
 Birth Models for entire space
 """
 birthgmm = []
-for x in range(-50, 50, 10):
-    for y in range(-50, 50, 10):
+for x in range(-50, 50, 5):
+    for y in range(-50, 50, 5):
         target = Target(init_weight=1,
                         init_state=np.array([[x], [y], [0.0], [0.0]]),
                         dt_1=0, dt_2=0)
