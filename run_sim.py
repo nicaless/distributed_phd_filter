@@ -51,15 +51,28 @@ for i in range(0, 2):
 node_attrs = {0: filternode_1,
               1: filternode_2,
               2: filternode_3}
-weight_attrs = {0: 1.0 / 3, 1: 1.0 / 3, 2: 1.0 / 3}
+
+weight_attrs = {}
+for i in range(0, 3):
+    weight_attrs[i] = {}
+    self_degree = G.degree(i)
+    metropolis_weights = []
+    for n in G.neighbors(i):
+        degree = G.degree(n)
+        mw = 1 / (1 + max(self_degree, degree))
+        weight_attrs[i][n] = mw
+        metropolis_weights.append(mw)
+    weight_attrs[i][i] = 1 - sum(metropolis_weights)
+
 
 filternetwork = PHDFilterNetwork(node_attrs, weight_attrs, G)
-
 
 """
 Run Simulation
 """
-filternetwork.step_through(generator.observations, how='arith')
+filternetwork.step_through(generator.observations,
+                           generator.true_positions,
+                           how='arith')
 
 """
 Plot

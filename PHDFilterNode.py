@@ -70,7 +70,8 @@ class PHDFilterNode:
 
     def predict(self):
         # Existing Targets
-        updated = [deepcopy(t) for t in self.targets]
+        updated = [deepcopy(t) for t in self.targets
+                   if not self.check_measure_oob(t.state)]
         for t in updated:
             t.next_state()
             t.weight = t.weight * self.survival_prob
@@ -86,7 +87,8 @@ class PHDFilterNode:
         all_targets = keep_updated + born
         predicted_pos = []
         for p in all_targets:
-            predicted_pos.append(p.get_measurement())
+            new_meas = p.get_measurement()
+            predicted_pos.append(new_meas)
 
         self.predicted_pos = predicted_pos
         self.predicted_targets = all_targets
@@ -147,6 +149,9 @@ class PHDFilterNode:
         self.updated_targets = newgmm
 
     def check_measure_oob(self, m):
+        # # TODO: investigate why there have nan states/measurements anyway
+        # any_nan = np.isnan(m).any()
+
         x = m[0][0]
         y = m[1][0]
 

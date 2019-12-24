@@ -3,6 +3,7 @@ import networkx as nx
 import numpy as np
 from operator import attrgetter
 
+from optimization_utils import *
 from reconfig_utils import *
 from target import Target
 
@@ -21,14 +22,14 @@ class PHDFilterNetwork:
         self.target_estimates = []
 
         self.node_share = {}
-        self.cardinality = 0
+        self.cardinality = {}
         self.node_keep = {}
 
         # TRACKERS
         self.adjacencies = {}
         self.weighted_adjacencies = {}
 
-    def step_through(self, measurements, L=1, how='geom'):
+    def step_through(self, measurements, true_targets, L=1, how='geom', opt='agent'):
         nodes = nx.get_node_attributes(self.network, 'node')
         if not isinstance(measurements, dict):
             measurements = {0: measurements}
@@ -52,19 +53,29 @@ class PHDFilterNetwork:
                     self.get_closest_comps(id)
                 self.update_comps(how=how)
 
-            # TODO: Apply Optimization and Update Position
             if failure:
                 A = self.adjacency_matrix()
                 current_coords = {nid: n.position for nid, n in nodes.items()}
                 fov = {nid: n.fov for nid, n in nodes.items()}
 
-                # TODO: Apply Optimization
-                # TODO: ensure order of Ps are close...
-                A[0, 2] = 1
-                A[2, 0] = 1
+                weights = nx.get_node_attributes(self.network, 'weights')
+                if opt == 'agent':
+                    covariance_data = self.get_covariance_trace(true_targets[i],
+                                                                how=how)
+                    A, new_weights = agent_opt(A, weights, covariance_data,
+                                               failed_node=0)
+                else:
+                    # TODO: implement global optimization
+                    covariance_data = self.get_covariance_trace(true_targets[i])
+                    A, new_weights = agent_opt(A, weights, covariance_data,
+                                               failed_node=0)
+
+                G = nx.from_numpy_matrix(A)
+                self.network = G
+                nx.set_node_attributes(self.network, nodes, 'node')
+                nx.set_node_attributes(self.network, new_weights, 'weights')
 
                 centroid = self.get_centroid()
-
                 new_coords = generate_coords(A, current_coords, fov, centroid)
                 for id, n in nodes.items():
                     n.update_position(new_coords[id])
@@ -75,6 +86,48 @@ class PHDFilterNetwork:
 
             self.adjacencies[i] = self.adjacency_matrix()
             self.weighted_adjacencies[i] = self.weighted_adjacency_matrix()
+
+    def get_covariance_trace(self, true_targets, how='geom'):
+        nodes = nx.get_node_attributes(self.network, 'node')
+        min_card = min([c for i, c in self.cardinality.items()])
+        min_targets = min([len(n.targets) for i, n in nodes.items()])
+        min_targets = min(min_targets, min_card)
+
+        covariance_matrix = self.get_covariance_matrix(min_targets,
+                                                       true_targets)
+        covariance_data = []
+        for n, node in nodes.items():
+            if how == 'geom':
+                # d = np.trace(np.linalg.inv(node.targets[0].state_cov))
+                d = np.trace(np.linalg.inv(covariance_matrix[n] +
+                                           np.eye(covariance_matrix[n].shape[0])
+                                           * 10e-6))
+            else:
+                # d = np.trace(node.targets[0].state_cov)
+                d = np.trace(covariance_matrix[n])
+            d = d / float(self.cardinality[n])
+            covariance_data.append(d)
+
+        return covariance_data
+
+    def get_covariance_matrix(self, min_targets, true_targets):
+        nodes = nx.get_node_attributes(self.network, 'node')
+
+        keep_targets = true_targets[:min_targets]
+
+        all_covs = []
+        for n, node in nodes.items():
+            cov = np.zeros((4 * len(keep_targets), 4 * len(keep_targets)))
+            all_covs.append(cov)
+
+        for i, t in enumerate(keep_targets):
+            for n, node in nodes.items():
+                distances = [math.hypot(t[0] - comp.state[0][0],
+                                        t[1] - comp.state[1][0])
+                             for comp in node.targets]
+                min_index = distances.index(min(distances))
+                all_covs[n][i:i+4, i:i+4] = node.targets[min_index].state_cov
+        return all_covs
 
     def get_centroid(self):
         nodes = nx.get_node_attributes(self.network, 'node')
@@ -89,30 +142,47 @@ class PHDFilterNetwork:
         center_y = sum(y) / float(len(x))
         return np.array([[center_x], [center_y]])
 
+    # def cardinality_consensus(self):
+    #     nodes = nx.get_node_attributes(self.network, 'node')
+    #     weights = nx.get_node_attributes(self.network, 'weights')
+    #
+    #     weighted_est = 0
+    #     tot_est = []
+    #     for n in list(self.network.nodes()):
+    #         est = sum([t.weight for t in nodes[n].targets])
+    #         weighted_est += est * weights[n]
+    #         tot_est.append(est)
+    #
+    #     # Rescale Weights using total weighted estimate
+    #     for n in list(self.network.nodes()):
+    #         for t in nodes[n].targets:
+    #             t.weight *= np.ceil(weighted_est) / tot_est[n]
+    #
+    #     self.cardinality = int(np.ceil(weighted_est))
+
     def cardinality_consensus(self):
         nodes = nx.get_node_attributes(self.network, 'node')
         weights = nx.get_node_attributes(self.network, 'weights')
 
-        weighted_est = 0
-        tot_est = []
-        for n in list(self.network.nodes()):
-            est = sum([t.weight for t in nodes[n].targets])
-            weighted_est += est * weights[n]
-            tot_est.append(est)
+        for n1 in list(self.network.nodes()):
+            weighted_est = 0
+            tot_est = {}
+            for n2, weight in weights[n1].items():
+                est = sum([t.weight for t in nodes[n2].targets])
+                weighted_est += est * weight
+                tot_est[n2] = est
 
-        # Rescale Weights using total weighted estimate
-        for n in list(self.network.nodes()):
-            for t in nodes[n].targets:
-                # t.weight = np.ceil(weighted_est) / tot_est[n]
-                # TODO: check if this is correct
-                t.weight *= np.ceil(weighted_est) / tot_est[n]
+            # Rescale Weights using total weighted estimate
+            for t in nodes[n1].targets:
+                t.weight *= np.ceil(weighted_est) / tot_est[n1]
 
-        self.cardinality = int(np.ceil(weighted_est))
+            self.cardinality[n1] = int(np.ceil(weighted_est))
 
     def reduce_comps(self, node_id):
         node = nx.get_node_attributes(self.network, 'node')[node_id]
         node_comps = node.targets
-        limit = min(self.cardinality, node.max_components)
+        # limit = min(self.cardinality, node.max_components)
+        limit = min(self.cardinality[node_id], node.max_components)
         keep_node_comps = node_comps[:limit]
         node.targets = keep_node_comps
 
@@ -140,7 +210,8 @@ class PHDFilterNetwork:
             x_state = node_comps[i].state
             x_cov = node_comps[i].state_cov
             for neighbor, n_comps in neighbor_comps.items():
-                y_weight = nx.get_node_attributes(self.network, 'weights')[neighbor]
+                y_weight = nx.get_node_attributes(self.network,
+                                                  'weights')[node_id][neighbor]
                 d = merge_thresh
                 for neighbor_comp in n_comps:
                     y_state = neighbor_comp.state
@@ -157,13 +228,15 @@ class PHDFilterNetwork:
 
     def update_comps(self, how='geom'):
         for n in list(self.network.nodes()):
+            node = nx.get_node_attributes(self.network, 'node')[n]
             if how == 'geom':
                 new_comps = self.fuse_comps_geom(n)
             else:
                 new_comps = self.fuse_comps_arith(n)
             new_comps.sort(key=attrgetter('weight'), reverse=True)
-            node = nx.get_node_attributes(self.network, 'node')[n]
-            # node.targets = new_comps
+
+            if np.isnan([comp.state for comp in new_comps]).any():
+                print('nan state after fusing comps')
 
             node.updated_targets = new_comps
             node.prune()
@@ -175,7 +248,11 @@ class PHDFilterNetwork:
 
         new_covs = self.fuse_covs(node_id, how='arith')
         new_states, did_fuse = self.fuse_states(node_id, how='arith')
+        if np.isnan(new_states).any():
+            print('nan states after fusion')
         new_alphas = self.fuse_alphas(node_id, new_covs, new_states, how='arith')
+        if np.isnan(new_alphas).any():
+            print('nan alphas after fusion')
 
         fused_comps = []
         for i in range(len(new_alphas)):
@@ -226,9 +303,11 @@ class PHDFilterNetwork:
 
             if how == 'geom':
                 comp_cov_inv = np.linalg.inv(node_comps[i].state_cov)
-                sum_covs = weight * comp_cov_inv
+                # sum_covs = weight * comp_cov_inv
+                sum_covs = weight[node_id] * comp_cov_inv
             else:
-                sum_covs = weight * node_comps[i].state_cov
+                # sum_covs = weight * node_comps[i].state_cov
+                sum_covs = weight[node_id] * node_comps[i].state_cov
 
             for c in closest_neighbor_comps[i]:
                 n_weight = c[0]
@@ -266,10 +345,13 @@ class PHDFilterNetwork:
             comp_state = node_comps[i].state
             if how == 'geom':
                 comp_cov_inv = np.linalg.inv(node_comps[i].state_cov)
-                sum_states = weight * np.dot(comp_cov_inv, comp_state)
+                # sum_states = weight * np.dot(comp_cov_inv, comp_state)
+                sum_states = weight[node_id] * np.dot(comp_cov_inv, comp_state)
             else:
-                sum_states = weight * comp_state
-                sum_weights = weight
+                # sum_states = weight * comp_state
+                # sum_weights = weight
+                sum_states = weight[node_id] * comp_state
+            sum_weights = weight[node_id]
 
             for c in closest_neighbor_comps[i]:
                 n_weight = c[0]
@@ -280,11 +362,16 @@ class PHDFilterNetwork:
                     sum_states += n_weight * np.dot(n_comp_cov_inv, n_comp_state)
                 else:
                     sum_states += n_weight * n_comp_state
-                    sum_weights += n_weight
-            if how == 'geom':
-                new_states.append(sum_states)
+                sum_weights += n_weight
+
+            if sum_weights == 0:
+                new_states.append(node_comps[i].state)
+                did_fuse.append(0)
             else:
-                new_states.append(sum_states / float(sum_weights))
+                if how == 'geom':
+                    new_states.append(sum_states)
+                else:
+                    new_states.append(sum_states / float(sum_weights))
 
         return new_states, did_fuse
 
@@ -306,12 +393,13 @@ class PHDFilterNetwork:
 
             comp_alpha = node_comps[i].weight
             if how == 'geom':
-                all_comps = [(weight, node_comps[i])] + closest_neighbor_comps[i]
+                all_comps = [(weight[node_id], node_comps[i])] + \
+                            closest_neighbor_comps[i]
                 K = self.calcK(i, all_comps, new_covs, new_states)
                 comp_cov = node_comps[i].state_cov
-                rescaler = self.rescaler(comp_cov, weight)
+                rescaler = self.rescaler(comp_cov, weight[node_id])
                 # prod_alpha = comp_alpha ** weight * rescaler * K
-                prod_alpha = (comp_alpha ** weight) * rescaler
+                prod_alpha = (comp_alpha ** weight[node_id]) * rescaler
             else:
                 sum_alpha = comp_alpha
 
@@ -384,9 +472,9 @@ class PHDFilterNetwork:
 
         for n in list(G.nodes()):
             weights = nx.get_node_attributes(G, 'weights')
-            A[n, n] = weights[n]
+            A[n, n] = weights[n][n]
             for i, neighbor in enumerate(list(G.neighbors(n))):
-                A[n, neighbor] = weights[neighbor]
+                A[n, neighbor] = weights[n][neighbor]
 
         return A
 
