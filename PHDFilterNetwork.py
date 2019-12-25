@@ -55,8 +55,13 @@ class PHDFilterNetwork:
                     self.get_closest_comps(id)
                 self.update_comps(how=how)
 
-            covariance_trace = self.get_covariance_trace(true_targets[i],
-                                                         how=how)
+            min_card = min([c for i, c in self.cardinality.items()])
+            min_targets = min([len(n.targets) for i, n in nodes.items()])
+            min_targets = min(min_targets, min_card)
+            covariance_matrix = self.get_covariance_matrix(min_targets,
+                                                           true_targets[i])
+            c_data, c_tr, c_inv_tr = self.get_covariance_trace(covariance_matrix,
+                                                               how=how)
             if failure:
                 A = self.adjacency_matrix()
                 current_coords = {nid: n.position for nid, n in nodes.items()}
@@ -65,13 +70,10 @@ class PHDFilterNetwork:
                 weights = nx.get_node_attributes(self.network, 'weights')
 
                 if opt == 'agent':
-                    A, new_weights = agent_opt(A, weights, covariance_trace,
+                    A, new_weights = agent_opt(A, weights, c_data,
                                                failed_node=0)
                 else:
-                    # TODO: implement global optimization
-                    covariance_data = []
-                    A, new_weights = agent_opt(A, weights, covariance_data,
-                                               failed_node=0)
+                    A, new_weights = team_opt(A, weights, covariance_matrix)
 
                 G = nx.from_numpy_matrix(A)
                 self.network = G
@@ -87,33 +89,34 @@ class PHDFilterNetwork:
             for id, n in nodes.items():
                 n.update_trackers(i, pre_consensus=False)
 
-            self.max_trace_cov[i] = max(covariance_trace)
+            self.max_trace_cov[i] = max(c_tr)
             self.errors[i] = self.calc_errors(true_targets[i])
             self.adjacencies[i] = self.adjacency_matrix()
             self.weighted_adjacencies[i] = self.weighted_adjacency_matrix()
 
-    def get_covariance_trace(self, true_targets, how='geom'):
+    def get_covariance_trace(self, cov_matrix, how='geom'):
         nodes = nx.get_node_attributes(self.network, 'node')
-        min_card = min([c for i, c in self.cardinality.items()])
-        min_targets = min([len(n.targets) for i, n in nodes.items()])
-        min_targets = min(min_targets, min_card)
 
-        covariance_matrix = self.get_covariance_matrix(min_targets,
-                                                       true_targets)
+        covariance_matrix = cov_matrix
+
         covariance_data = []
+        cov_tr = []
+        inv_cov_tr = []
         for n, node in nodes.items():
+            cov = covariance_matrix[n]
+            tr_cov = np.trace(cov)
+            tr_inv_cov = np.trace(np.linalg.inv(cov +
+                                                np.eye(cov.shape[0]) * 10e-6))
+            cov_tr.append(tr_cov)
+            inv_cov_tr.append(tr_inv_cov)
             if how == 'geom':
-                # d = np.trace(np.linalg.inv(node.targets[0].state_cov))
-                d = np.trace(np.linalg.inv(covariance_matrix[n] +
-                                           np.eye(covariance_matrix[n].shape[0])
-                                           * 10e-6))
+                d = tr_inv_cov
             else:
-                # d = np.trace(node.targets[0].state_cov)
-                d = np.trace(covariance_matrix[n])
+                d = tr_cov
             d = d / float(self.cardinality[n])
             covariance_data.append(d)
 
-        return covariance_data
+        return covariance_data, cov_tr, inv_cov_tr
 
     def get_covariance_matrix(self, min_targets, true_targets):
         nodes = nx.get_node_attributes(self.network, 'node')

@@ -72,7 +72,8 @@ Run Simulation
 """
 filternetwork.step_through(generator.observations,
                            generator.true_positions,
-                           how='arith')
+                           how='arith',
+                           opt='team')
 
 """
 Plot Positions

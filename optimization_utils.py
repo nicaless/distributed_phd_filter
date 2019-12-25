@@ -1,4 +1,6 @@
+import csv
 import numpy as np
+import os
 import picos as pic
 
 
@@ -61,20 +63,65 @@ def agent_opt(adj_mat, current_weights, covariance_data, ne=1, failed_node=None)
         return adj_mat, current_weights
 
     new_config = np.zeros(adj_mat.shape)
-    # new_weights = np.zeros(adj_mat.shape)
     new_weights = {}
     for i in range(n):
         new_weights[i] = {}
 
     for i in range(n):
-        # new_weights[i, i] = A[i, i].value
         new_weights[i][i] = A[i, i].value
         new_config[i, i] = 1
         for j in range(i + 1, n):
             new_config[i, j] = round(PI[i, j].value)
             new_config[j, i] = round(PI[j, i].value)
-            # new_weights[i, j] = A[i, j].value
-            # new_weights[j, i] = A[j, i].value
             new_weights[i][j] = A[i, j].value
             new_weights[j][i] = A[j, i].value
     return new_config, new_weights
+
+
+def team_opt(adj_mat, current_weights, covariance_matrices, ne=1):
+    A = adj_mat
+    n = adj_mat.shape[0]
+    for c, cov in enumerate(covariance_matrices):
+        f_name = 'misdp_data/inverse_covariance_matrices/{c}.csv'
+        np.savetxt(f_name.format(c=c), np.asarray(cov), delimiter=",")
+    np.savetxt('misdp_data/adj_mat.csv', A, delimiter=",")
+    matlab_string = '/Applications/MATLAB_R2019a.app/bin/matlab -nodesktop -nosplash -r "MISDP_new_copy({e});exit;"'.format(
+        e=ne)
+    os.system(matlab_string)
+    if os.path.exists('misdp_data/fail.txt'):
+        os.system(matlab_string)
+        os.unlink('misdp_data/fail.txt')
+    if os.path.exists('misdp_data/new_weights.csv'):
+        new_weights = []
+        with open('misdp_data/new_weights.csv', 'r') as f:
+            readCSV = csv.reader(f, delimiter=',')
+            for row in readCSV:
+                data = list(map(float, row))
+                new_weights.append(data)
+        new_weights_mat = np.array(new_weights)
+    else:
+        new_weights = current_weights
+
+    new_A = []
+    with open('misdp_data/new_A.csv', 'r') as f:
+        readCSV = csv.reader(f, delimiter=',')
+        for row in readCSV:
+            data = list(map(float, row))
+            new_A.append(data)
+    new_A = np.array(new_A)
+
+    if 'new_weights_mat' in locals():
+        if np.array_equal(new_weights_mat, new_A):
+            new_weights = current_weights
+        else:
+            new_weights = {}
+            for i in range(n):
+                new_weights[i] = {}
+            for i in range(n):
+                new_weights[i][i] = new_weights_mat[i, i]
+                for j in range(i + 1, n):
+                    new_weights[i][j] = new_weights_mat[i, j]
+                    new_weights[j][i] = new_weights_mat[j, i]
+
+    return new_A, new_weights
+
