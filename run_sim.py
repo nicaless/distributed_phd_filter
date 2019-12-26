@@ -1,6 +1,8 @@
+from copy import deepcopy
 import matplotlib.pyplot as plt
 import networkx as nx
 import numpy as np
+import pandas as pd
 
 from PHDFilterNetwork import PHDFilterNetwork
 from PHDFilterNode import PHDFilterNode
@@ -12,6 +14,7 @@ np.random.seed(42)
 """
 Generate Data
 """
+fail_int = [i for i in range(50) if i == 10]
 generator = SimGenerator(5, init_targets=[Target()])
 generator.generate(50)
 
@@ -66,6 +69,9 @@ for i in range(0, 3):
 
 
 filternetwork = PHDFilterNetwork(node_attrs, weight_attrs, G)
+filternetwork2 = PHDFilterNetwork(deepcopy(node_attrs),
+                                  deepcopy(weight_attrs),
+                                  deepcopy(G))
 
 """
 Run Simulation
@@ -73,7 +79,14 @@ Run Simulation
 filternetwork.step_through(generator.observations,
                            generator.true_positions,
                            how='arith',
-                           opt='team')
+                           opt='agent',
+                           fail_int=fail_int)
+
+filternetwork2.step_through(generator.observations,
+                            generator.true_positions,
+                            how='arith',
+                            opt='agent',
+                            fail_sequence=filternetwork.failures)
 
 """
 Plot Positions
@@ -132,3 +145,21 @@ plt.plot(time, max_trace_cov, label='max_tr_cov')
 plt.legend()
 plt.savefig('test/_max_tr_cov.png')
 plt.clf()
+
+
+"""
+Save Fail Sequence
+"""
+
+for i, vals in filternetwork.failures.items():
+    rpd_filename = 'fail_sequence/' + '{i}.csv'.format(i=i)
+    np.savetxt(rpd_filename, vals[1], delimiter=",")
+df = pd.DataFrame.from_dict(filternetwork.failures, orient='index')
+df[[0]].to_csv('fail_sequence/_node_list.csv', header=None)
+
+"""
+Save Adjacencies
+"""
+# print(filternetwork.adjacencies)
+# print(filternetwork.failures)
+

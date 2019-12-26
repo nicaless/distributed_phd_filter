@@ -22,11 +22,11 @@ class PHDFilterNode:
 
         self.position = position
         self.region = region
+        self.R = np.eye(2)
         self.fov = (region[0][1] - region[0][0]) / 2.0
         area = (region[0][1] - region[0][0]) * (region[1][1] - region[1][0])
         self.clutter_intensity = clutter_rate / area
 
-        self.birthgmm = birthgmm
         self.prune_thresh = prune_thresh
         self.merge_thresh = merge_thresh
         self.max_components = max_comp
@@ -34,6 +34,7 @@ class PHDFilterNode:
         self.survival_prob = 0.98
         self.detection_probability = 0.95
 
+        self.birthgmm = birthgmm
         self.targets = []
 
         # prediction results
@@ -85,8 +86,11 @@ class PHDFilterNode:
             b.weight = b.weight / float(len(born))
 
         all_targets = keep_updated + born
+
+        # Set R for All Targets then get measurement
         predicted_pos = []
         for p in all_targets:
+            p.R = self.R
             new_meas = p.get_measurement()
             predicted_pos.append(new_meas)
 

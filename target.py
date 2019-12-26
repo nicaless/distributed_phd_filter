@@ -1,5 +1,6 @@
 import math
 import numpy as np
+import scipy
 
 
 class Target:
@@ -46,8 +47,7 @@ class Target:
 
         self.Q = np.eye(init_state.shape[0])
 
-        # self.H = np.array([[1, 0, 0, 0], [0, 1, 0, 0]])
-        self.H = np.array([[1, 0, 1, 0], [0, 1, 0, 1]])
+        self.H = np.array([[1, 0, 0, 0], [0, 1, 0, 0]])
         self.R = np.eye(2)
 
         self.process_noise = process_noise
@@ -80,5 +80,6 @@ class Target:
 
     def sample(self, N=1):
         return np.random.multivariate_normal(self.state.flat, self.state_cov, size=N)
+
 
 

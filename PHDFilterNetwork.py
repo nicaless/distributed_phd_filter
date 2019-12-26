@@ -2,9 +2,10 @@ import math
 import networkx as nx
 import numpy as np
 from operator import attrgetter
-
 from optimization_utils import *
 from reconfig_utils import *
+import scipy
+
 from target import Target
 
 
@@ -26,20 +27,29 @@ class PHDFilterNetwork:
         self.node_keep = {}
 
         # TRACKERS
+        self.failures = {}
         self.adjacencies = {}
         self.weighted_adjacencies = {}
         self.errors = {}
         self.max_trace_cov = {}
 
-    def step_through(self, measurements, true_targets, L=1, how='geom', opt='agent'):
+    def step_through(self, measurements, true_targets,
+                     L=1, how='geom', opt='agent',
+                     fail_int=None, fail_sequence=None):
         nodes = nx.get_node_attributes(self.network, 'node')
         if not isinstance(measurements, dict):
             measurements = {0: measurements}
         failure = False
         for i, m in measurements.items():
-            # TODO: Apply Failure Event
-            if i == 10:
-                failure = True
+            if fail_int is not None or fail_sequence is not None:
+                if fail_int is not None:
+                    if i in fail_int:
+                        failure = True
+                        self.apply_failure(i)
+                else:
+                    if i in fail_sequence:
+                        failure = True
+                        self.apply_failure(i, fail=fail_sequence[i])
 
             for id, n in nodes.items():
                 n.step_through(m, i)
@@ -93,6 +103,28 @@ class PHDFilterNetwork:
             self.errors[i] = self.calc_errors(true_targets[i])
             self.adjacencies[i] = self.adjacency_matrix()
             self.weighted_adjacencies[i] = self.weighted_adjacency_matrix()
+
+    def apply_failure(self, i, fail=None):
+        nodes = nx.get_node_attributes(self.network, 'node')
+
+        # Generate new R
+        if fail is None:
+            fail_node = np.random.choice(list(nodes.keys()))
+
+            # Get R from Node
+            R = nodes[fail_node].R
+
+            r_mat_size = R.shape[0]
+            r = scipy.random.rand(r_mat_size, r_mat_size)
+            rpd = np.dot(r, r.T)
+        else:
+            fail_node = fail[0]
+            rpd = fail[1]
+            R = nodes[fail_node].R
+
+        R = R + rpd
+        nodes[fail_node].R = R
+        self.failures[i] = (fail_node, rpd)
 
     def get_covariance_trace(self, cov_matrix, how='geom'):
         nodes = nx.get_node_attributes(self.network, 'node')
@@ -150,24 +182,6 @@ class PHDFilterNetwork:
         center_y = sum(y) / float(len(x))
         return np.array([[center_x], [center_y]])
 
-    # def cardinality_consensus(self):
-    #     nodes = nx.get_node_attributes(self.network, 'node')
-    #     weights = nx.get_node_attributes(self.network, 'weights')
-    #
-    #     weighted_est = 0
-    #     tot_est = []
-    #     for n in list(self.network.nodes()):
-    #         est = sum([t.weight for t in nodes[n].targets])
-    #         weighted_est += est * weights[n]
-    #         tot_est.append(est)
-    #
-    #     # Rescale Weights using total weighted estimate
-    #     for n in list(self.network.nodes()):
-    #         for t in nodes[n].targets:
-    #             t.weight *= np.ceil(weighted_est) / tot_est[n]
-    #
-    #     self.cardinality = int(np.ceil(weighted_est))
-
     def cardinality_consensus(self):
         nodes = nx.get_node_attributes(self.network, 'node')
         weights = nx.get_node_attributes(self.network, 'weights')
@@ -189,7 +203,6 @@ class PHDFilterNetwork:
     def reduce_comps(self, node_id):
         node = nx.get_node_attributes(self.network, 'node')[node_id]
         node_comps = node.targets
-        # limit = min(self.cardinality, node.max_components)
         limit = min(self.cardinality[node_id], node.max_components)
         keep_node_comps = node_comps[:limit]
         node.targets = keep_node_comps
@@ -311,10 +324,8 @@ class PHDFilterNetwork:
 
             if how == 'geom':
                 comp_cov_inv = np.linalg.inv(node_comps[i].state_cov)
-                # sum_covs = weight * comp_cov_inv
                 sum_covs = weight[node_id] * comp_cov_inv
             else:
-                # sum_covs = weight * node_comps[i].state_cov
                 sum_covs = weight[node_id] * node_comps[i].state_cov
 
             for c in closest_neighbor_comps[i]:
@@ -353,11 +364,8 @@ class PHDFilterNetwork:
             comp_state = node_comps[i].state
             if how == 'geom':
                 comp_cov_inv = np.linalg.inv(node_comps[i].state_cov)
-                # sum_states = weight * np.dot(comp_cov_inv, comp_state)
                 sum_states = weight[node_id] * np.dot(comp_cov_inv, comp_state)
             else:
-                # sum_states = weight * comp_state
-                # sum_weights = weight
                 sum_states = weight[node_id] * comp_state
             sum_weights = weight[node_id]
 
@@ -418,7 +426,6 @@ class PHDFilterNetwork:
                 if how == 'geom':
                     n_comp_cov = n_comp.state_cov
                     rescaler = self.rescaler(n_comp_cov, n_weight)
-                    # prod_alpha *= n_comp_alpha ** n_weight * rescaler * K
                     prod_alpha *= (n_comp_alpha ** n_weight) * rescaler
                 else:
                     sum_alpha += n_comp_alpha
