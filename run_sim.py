@@ -78,15 +78,15 @@ Run Simulation
 """
 filternetwork.step_through(generator.observations,
                            generator.true_positions,
-                           how='arith',
+                           how='geom',
                            opt='agent',
                            fail_int=fail_int)
 
-filternetwork2.step_through(generator.observations,
-                            generator.true_positions,
-                            how='arith',
-                            opt='agent',
-                            fail_sequence=filternetwork.failures)
+# filternetwork2.step_through(generator.observations,
+#                             generator.true_positions,
+#                             how='arith',
+#                             opt='agent',
+#                             fail_sequence=filternetwork.failures)
 
 """
 Plot Positions

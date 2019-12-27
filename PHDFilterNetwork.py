@@ -34,7 +34,7 @@ class PHDFilterNetwork:
         self.max_trace_cov = {}
 
     def step_through(self, measurements, true_targets,
-                     L=1, how='geom', opt='agent',
+                     L=3, how='geom', opt='agent',
                      fail_int=None, fail_sequence=None):
         nodes = nx.get_node_attributes(self.network, 'node')
         if not isinstance(measurements, dict):
@@ -64,6 +64,8 @@ class PHDFilterNetwork:
                     self.share_info(id)
                     self.get_closest_comps(id)
                 self.update_comps(how=how)
+                for id, n in nodes.items():
+                    self.reduce_comps(id)
 
             min_card = min([c for i, c in self.cardinality.items()])
             min_targets = min([len(n.targets) for i, n in nodes.items()])
@@ -92,8 +94,9 @@ class PHDFilterNetwork:
 
                 centroid = self.get_centroid()
                 new_coords = generate_coords(A, current_coords, fov, centroid)
-                for id, n in nodes.items():
-                    n.update_position(new_coords[id])
+                if new_coords:
+                    for id, n in nodes.items():
+                        n.update_position(new_coords[id])
                 failure = False
 
             for id, n in nodes.items():
@@ -145,7 +148,10 @@ class PHDFilterNetwork:
                 d = tr_inv_cov
             else:
                 d = tr_cov
-            d = d / float(self.cardinality[n])
+            if self.cardinality[n] == 0:
+                d = 0
+            else:
+                d = d / float(self.cardinality[n])
             covariance_data.append(d)
 
         return covariance_data, cov_tr, inv_cov_tr
@@ -204,6 +210,7 @@ class PHDFilterNetwork:
         node = nx.get_node_attributes(self.network, 'node')[node_id]
         node_comps = node.targets
         limit = min(self.cardinality[node_id], node.max_components)
+        self.cardinality[node_id] = limit
         keep_node_comps = node_comps[:limit]
         node.targets = keep_node_comps
 
@@ -258,6 +265,11 @@ class PHDFilterNetwork:
 
             if np.isnan([comp.state for comp in new_comps]).any():
                 print('nan state after fusing comps')
+
+            tot_est = sum([comp.weight for comp in new_comps])
+            # Rescale Weights using cardinality
+            for t in new_comps:
+                t.weight *= self.cardinality[n] / tot_est
 
             node.updated_targets = new_comps
             node.prune()
@@ -337,6 +349,7 @@ class PHDFilterNetwork:
                 else:
                     sum_covs += n_weight * n_comp.state_cov
             if how == 'geom':
+                # sum_covs = np.eye(sum_covs.shape[0]) * 10e-6
                 new_covs.append(np.linalg.inv(sum_covs))
             else:
                 new_covs.append(sum_covs)
@@ -454,6 +467,7 @@ class PHDFilterNetwork:
             weight = c[0]
             state = c[1].state
             cov = c[1].state_cov
+            # cov = np.eye(cov.shape[0]) * 10e-6
             secondterm_1n += np.log(np.linalg.det(weight * np.linalg.inv(cov)))
             thirdterm_1n += weight * np.dot(np.dot(state.T,
                                                    np.linalg.inv(cov)),
@@ -500,11 +514,15 @@ class PHDFilterNetwork:
         for i, t in enumerate(true_targets):
             errors = []
             for n, node in nodes.items():
-                distances = [math.hypot(t[0] - comp.state[0][0],
-                                        t[1] - comp.state[1][0])
-                             for comp in node.targets]
-                errors.append(min(distances))
-            max_errors.append(max(errors))
+                if not node.check_measure_oob(t) and len(node.targets) > 0:
+                    distances = [math.hypot(t[0] - comp.state[0][0],
+                                            t[1] - comp.state[1][0])
+                                 for comp in node.targets]
+                    errors.append(min(distances))
+            if len(errors) == 0:
+                max_errors.append(0)
+            else:
+                max_errors.append(max(errors))
         return np.max(max_errors)
 
 

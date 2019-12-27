@@ -4,7 +4,7 @@ import numpy as np
 
 def generate_coords(new_config, current_coords, fov, target_estimate,
                     bbox=np.array([(-50, 50), (-50, 50), (10, 100)]),
-                    delta=5, safe_dist=5, connect_dist=10, k=-0.1, steps=1000):
+                    delta=10, safe_dist=10, connect_dist=25, k=-0.1, steps=1000):
     """
     Uses Simulated Annealing to generate new coordinates given new config
 
@@ -52,6 +52,7 @@ def generate_coords(new_config, current_coords, fov, target_estimate,
         if not valid_config:
             invalid_configs = invalid_configs + 1
         if invalid_configs > 5:
+            print('could not find valid config')
             return False
 
     return new_coords
@@ -137,7 +138,7 @@ def energyCoverage(config, propose_coords, fov, target_estimate,
     sum_focus = ph(dist_from_target - fov[i], H)
 
     return (k * total_coverage) + coverage_penalties + \
-           sum_box + sum_safe + sum_conn + (k * sum_focus)
+           sum_box + sum_safe + sum_conn + sum_focus
 
 
 def isValidConfig(config, coords, safe_dist, connect_dist, bbox):
@@ -156,10 +157,13 @@ def isValidConfig(config, coords, safe_dist, connect_dist, bbox):
         # Check Position is within BBox
         x, y, z = coords[i]
         if not (bbox[0, 0] <= x <= bbox[0, 1]):
+            print("x pos not in bbox")
             return False
         if not (bbox[1, 0] <= y <= bbox[1, 1]):
+            print("y pos not in bbox")
             return False
         if not (bbox[2, 0] <= z <= bbox[2, 1]):
+            print("z pos not in bbox")
             return False
 
         for j in range(i + 1, n):

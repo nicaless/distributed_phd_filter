@@ -52,6 +52,12 @@ class Target:
 
         self.process_noise = process_noise
 
+    def set_dir(self, dt_1, dt_2):
+        self.A = np.array([[1, 0, dt_1, 0],
+                           [0, 1, 0, dt_2],
+                           [0, 0, 1, 0],
+                           [0, 0, 0, 1]])
+
     def next_state(self, noise=False):
         x = self.state
         if self.is_circle_trajectory:

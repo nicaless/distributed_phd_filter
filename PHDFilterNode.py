@@ -165,8 +165,32 @@ class PHDFilterNode:
         return x_out_of_bounds or y_out_of_bounds
 
     def prune(self):
-        prunedgmm = list(filter(lambda comp: comp.weight > self.prune_thresh,
-                                self.updated_targets))
+        # prunedgmm = list(filter(lambda comp: comp.weight > self.prune_thresh,
+        #                         self.updated_targets))
+
+        # Prune Targets w/ same state as previous time step or w/ low weight
+        prunedgmm = []
+        for t in self.updated_targets:
+            if t.weight > self.prune_thresh:
+                state_history = t.all_states
+                if len(state_history) == 1:
+                    prunedgmm.append(t)
+                else:
+                    curr_state = t.state
+                    prev_state = state_history[-2]
+                    if np.allclose(curr_state, prev_state):
+                        continue
+                    if curr_state[0][0] > prev_state[0][0]:
+                        dt_1 = 1
+                    else:
+                        dt_1 = -1
+                    if curr_state[1][0] > prev_state[1][0]:
+                        dt_2 = 1
+                    else:
+                        dt_2 = -1
+                    t.set_dir(dt_1, dt_2)
+                    prunedgmm.append(t)
+
         self.pruned_targets = prunedgmm
 
     def merge(self):
