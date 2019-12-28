@@ -40,16 +40,17 @@ class PHDFilterNetwork:
         if not isinstance(measurements, dict):
             measurements = {0: measurements}
         failure = False
+        new_metro_weights = False
         for i, m in measurements.items():
             if fail_int is not None or fail_sequence is not None:
                 if fail_int is not None:
                     if i in fail_int:
                         failure = True
-                        self.apply_failure(i)
+                        fail_node = self.apply_failure(i)
                 else:
                     if i in fail_sequence:
                         failure = True
-                        self.apply_failure(i, fail=fail_sequence[i])
+                        fail_node = self.apply_failure(i, fail=fail_sequence[i])
 
             for id, n in nodes.items():
                 n.step_through(m, i)
@@ -84,12 +85,33 @@ class PHDFilterNetwork:
                 if opt == 'agent':
                     A, new_weights = agent_opt(A, weights, c_data,
                                                failed_node=0)
+                elif opt == 'greedy':
+                    # trace of cov of non-neighbors
+                    c_tr_copy = deepcopy(c_tr)
+                    c_tr_copy[fail_node] = np.inf
+                    best_node = c_tr_copy.index(min(c_tr_copy))
+                    A[best_node, fail_node] = 1
+                    A[fail_node, best_node] = 1
+                    new_metro_weights = True
                 else:
                     A, new_weights = team_opt(A, weights, covariance_matrix)
 
                 G = nx.from_numpy_matrix(A)
                 self.network = G
                 nx.set_node_attributes(self.network, nodes, 'node')
+                if new_metro_weights:
+                    new_weights = {}
+                    for id in range(len(list(nodes.keys()))):
+                        new_weights[id] = {}
+                        self_degree = G.degree(id)
+                        metropolis_weights = []
+                        for n in G.neighbors(id):
+                            degree = G.degree(n)
+                            mw = 1 / (1 + max(self_degree, degree))
+                            new_weights[id][n] = mw
+                            metropolis_weights.append(mw)
+                        new_weights[id][id] = 1 - sum(metropolis_weights)
+                    new_metro_weights = False
                 nx.set_node_attributes(self.network, new_weights, 'weights')
 
                 centroid = self.get_centroid()
@@ -128,6 +150,7 @@ class PHDFilterNetwork:
         R = R + rpd
         nodes[fail_node].R = R
         self.failures[i] = (fail_node, rpd)
+        return fail_node
 
     def get_covariance_trace(self, cov_matrix, how='geom'):
         nodes = nx.get_node_attributes(self.network, 'node')

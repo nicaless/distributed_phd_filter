@@ -79,7 +79,7 @@ Run Simulation
 filternetwork.step_through(generator.observations,
                            generator.true_positions,
                            how='geom',
-                           opt='agent',
+                           opt='greedy',
                            fail_int=fail_int)
 
 # filternetwork2.step_through(generator.observations,
