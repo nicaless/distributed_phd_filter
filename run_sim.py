@@ -4,6 +4,8 @@ import networkx as nx
 import numpy as np
 import pandas as pd
 
+from ospa import *
+
 from PHDFilterNetwork import PHDFilterNetwork
 from PHDFilterNode import PHDFilterNode
 from SimGenerator import SimGenerator
@@ -14,7 +16,7 @@ np.random.seed(42)
 """
 Generate Data
 """
-fail_int = [i for i in range(50) if i in [10, 20]]
+fail_int = [i for i in range(50) if i in [10]]
 generator = SimGenerator(5, init_targets=[Target()])
 generator.generate(50)
 
@@ -79,7 +81,7 @@ Run Simulation
 filternetwork.step_through(generator.observations,
                            generator.true_positions,
                            how='arith',
-                           opt='team',
+                           opt='agent',
                            fail_int=fail_int)
 
 # filternetwork2.step_through(generator.observations,
@@ -127,23 +129,38 @@ for i, targets in generator.observations.items():
     plt.clf()
 
 """
-Plot Errors, Covariance
+Plot Errors, Covariance, OSPA
 """
 time = []
 error = []
 max_trace_cov = []
+ospa = []
+nmse_card = []
 for t in generator.observations.keys():
     time.append(t)
     error.append(filternetwork.errors[t])
     max_trace_cov.append(filternetwork.max_trace_cov[t])
+    ospa.append(filternetwork.gospa[t])
+    nmse_card.append(filternetwork.nmse_card[t])
 
 plt.plot(time, error, label='error')
 plt.legend()
 plt.savefig('test/_errors.png')
 plt.clf()
+
 plt.plot(time, max_trace_cov, label='max_tr_cov')
 plt.legend()
 plt.savefig('test/_max_tr_cov.png')
+plt.clf()
+
+plt.plot(time, ospa, label='ospa')
+plt.legend()
+plt.savefig('test/_ospa.png')
+plt.clf()
+
+plt.plot(time, nmse_card, label='nmse_card')
+plt.legend()
+plt.savefig('test/_nmse_card.png')
 plt.clf()
 
 
@@ -160,6 +177,5 @@ df[[0]].to_csv('fail_sequence/_node_list.csv', header=None)
 """
 Save Adjacencies
 """
-# print(filternetwork.adjacencies)
-# print(filternetwork.failures)
+
 

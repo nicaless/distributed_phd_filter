@@ -6,6 +6,8 @@ from optimization_utils import *
 from reconfig_utils import *
 import scipy
 
+from ospa import *
+
 from target import Target
 
 
@@ -32,6 +34,8 @@ class PHDFilterNetwork:
         self.weighted_adjacencies = {}
         self.errors = {}
         self.max_trace_cov = {}
+        self.gospa = {}
+        self.nmse_card = {}
 
     def step_through(self, measurements, true_targets,
                      L=3, how='geom', opt='agent',
@@ -126,6 +130,8 @@ class PHDFilterNetwork:
 
             self.max_trace_cov[i] = max(c_tr)
             self.errors[i] = self.calc_errors(true_targets[i])
+            self.gospa[i] = self.calc_ospa(true_targets[i])
+            self.nmse_card[i] = self.calc_nmse_card(true_targets[i])
             self.adjacencies[i] = self.adjacency_matrix()
             self.weighted_adjacencies[i] = self.weighted_adjacency_matrix()
 
@@ -553,7 +559,32 @@ class PHDFilterNetwork:
         return np.max(max_errors)
 
     def calc_ospa(self, true_targets):
-        pass
+        tracks = []
+        nodes = nx.get_node_attributes(self.network, 'node')
+
+        for n, node in nodes.items():
+            for t in node.targets:
+                tracks.append(np.array([[t.state[0][0]],
+                                        [t.state[1][0]]]))
+
+        gospa, \
+        target_to_track_assigments, \
+        gospa_localization, \
+        gospa_missed, \
+        gospa_false = calculate_gospa(true_targets, tracks)
+
+        return gospa
+
+    def calc_nmse_card(self, true_targets):
+        N = len(true_targets)
+        squared_error = 0
+        sum_card = 0
+
+        for n, card in self.cardinality.items():
+            squared_error += (card - N) ** 2
+            sum_card += card
+
+        return squared_error / (N * sum_card)
 
 
 
