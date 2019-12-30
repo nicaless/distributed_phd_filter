@@ -178,7 +178,7 @@ class PHDFilterNode:
                 else:
                     curr_state = t.state
                     prev_state = state_history[-2]
-                    if np.allclose(curr_state, prev_state):
+                    if np.allclose(curr_state, prev_state, rtol=1, atol=1):
                         continue
                     if curr_state[0][0] > prev_state[0][0]:
                         dt_1 = 1

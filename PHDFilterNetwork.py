@@ -206,6 +206,9 @@ class PHDFilterNetwork:
                 pos = np.array([[t.state[0][0]], [t.state[1][0]]])
                 all_phd_states.append(pos)
 
+        if len(all_phd_states) == 0:
+            return np.array([[0], [0]])
+
         x, y = zip(*all_phd_states)
         center_x = sum(x) / float(len(x))
         center_y = sum(y) / float(len(x))
@@ -465,6 +468,7 @@ class PHDFilterNetwork:
                     prod_alpha *= (n_comp_alpha ** n_weight) * rescaler
                 else:
                     sum_alpha += n_comp_alpha
+
             if how == 'geom':
                 new_alphas.append(prod_alpha * K)
             else:
@@ -547,6 +551,9 @@ class PHDFilterNetwork:
             else:
                 max_errors.append(max(errors))
         return np.max(max_errors)
+
+    def calc_ospa(self, true_targets):
+        pass
 
 
 

@@ -14,7 +14,7 @@ np.random.seed(42)
 """
 Generate Data
 """
-fail_int = [i for i in range(50) if i == 10]
+fail_int = [i for i in range(50) if i in [10, 20]]
 generator = SimGenerator(5, init_targets=[Target()])
 generator.generate(50)
 
@@ -78,8 +78,8 @@ Run Simulation
 """
 filternetwork.step_through(generator.observations,
                            generator.true_positions,
-                           how='geom',
-                           opt='greedy',
+                           how='arith',
+                           opt='team',
                            fail_int=fail_int)
 
 # filternetwork2.step_through(generator.observations,
