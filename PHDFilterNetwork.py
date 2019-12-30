@@ -2,12 +2,12 @@ import math
 import networkx as nx
 import numpy as np
 from operator import attrgetter
-from optimization_utils import *
-from reconfig_utils import *
+import pandas as pd
 import scipy
 
+from optimization_utils import *
 from ospa import *
-
+from reconfig_utils import *
 from target import Target
 
 
@@ -381,7 +381,7 @@ class PHDFilterNetwork:
                 else:
                     sum_covs += n_weight * n_comp.state_cov
             if how == 'geom':
-                # sum_covs = np.eye(sum_covs.shape[0]) * 10e-6
+                sum_covs = sum_covs + np.eye(sum_covs.shape[0]) * 10e-6
                 new_covs.append(np.linalg.inv(sum_covs))
             else:
                 new_covs.append(sum_covs)
@@ -585,6 +585,63 @@ class PHDFilterNetwork:
             sum_card += card
 
         return squared_error / (N * sum_card)
+
+    def save_metrics(self, path):
+        # Save Errors
+        errors = pd.DataFrame.from_dict(self.errors, orient='index')
+        errors.to_csv(path + '/errors.csv')
+
+        # Save Max Trace Cov
+        max_tr_cov = pd.DataFrame.from_dict(self.max_trace_cov, orient='index')
+        max_tr_cov.to_csv(path + '/max_tr_cov.csv')
+
+        # Save OSPA
+        ospa = pd.DataFrame.from_dict(self.gospa, orient='index')
+        ospa.to_csv(path + '/ospa.csv')
+
+        # Save NMSE
+        nmse = pd.DataFrame.from_dict(self.nmse_card, orient='index')
+        nmse.to_csv(path + '/nmse.csv')
+
+    def save_estimates(self, path):
+        all_nodes = nx.get_node_attributes(self.network, 'node')
+        time = []
+        x = []
+        y = []
+        for n, node in all_nodes.items():
+            for t, pos in node.consensus_positions.items():
+                for p in pos:
+                    time.append(t)
+                    x.append(p[0][0])
+                    y.append(p[1][0])
+        data = pd.DataFrame([time, x, y])
+        data = data.transpose()
+        data.columns = ['time', 'x', 'y']
+        data.to_csv(path + '/estimates.csv', index=False)
+
+    def save_positions(self, path):
+        time = []
+        x = []
+        y = []
+        z = []
+        fov = []
+        node_id = []
+        all_nodes = nx.get_node_attributes(self.network, 'node')
+        for n, node in all_nodes.items():
+            for t, pos in node.node_positions.items():
+                time.append(t)
+                x.append(pos[0])
+                y.append(pos[1])
+                z.append(pos[2])
+                fov.append(node.fov)
+                node_id.append(n)
+        data = pd.DataFrame([time, x, y, z, fov, node_id])
+        data = data.transpose()
+        data.columns = ['time', 'x', 'y', 'z', 'fov_radius', 'node_id']
+        data.to_csv(path + '/robot_positions.csv', index=False)
+
+
+
 
 
 

@@ -1,5 +1,6 @@
 import matplotlib.pyplot as plt
 import numpy as np
+import pandas as pd
 
 from target import Target
 
@@ -161,5 +162,16 @@ class SimGenerator:
         for k in range(0, self.current_step+1):
             self.plot_iter(k, folder=folder, show_clutter=show_clutter)
 
-    def save_data(self):
-        pass
+    def save_data(self, path):
+        time = []
+        x = []
+        y = []
+        for t, items in self.true_positions.items():
+            for item in items:
+                time.append(t)
+                x.append(item[0][0])
+                y.append(item[1][0])
+        data = pd.DataFrame([time, x, y])
+        data = data.transpose()
+        data.columns = ['time', 'x', 'y']
+        data.to_csv(path + '/true_positions.csv', index=False)
