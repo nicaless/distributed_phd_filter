@@ -1,7 +1,5 @@
 from copy import deepcopy
-import matplotlib.pyplot as plt
 import networkx as nx
-import numpy as np
 import pandas as pd
 import os
 
@@ -142,86 +140,10 @@ for how in ['arith', 'geom']:
         """
         if not os.path.exists(trial_name):
             os.makedirs(trial_name)
-            os.makedirs(trial_name + '/pngs')
+            os.makedirs(trial_name + '/3ds')
+            os.makedirs(trial_name + '/overhead')
             os.makedirs(trial_name + '/topologies')
         filternetwork.save_metrics(trial_name)
         filternetwork.save_estimates(trial_name)
         filternetwork.save_positions(trial_name)
-
-
-
-# """
-# Plot Positions
-# """
-#
-# for i, targets in generator.observations.items():
-#     # Plot True Positions
-#
-#     ax = plt.axes()
-#     plt.xlim((-50, 50))
-#     plt.ylim((-50, 50))
-#     x = []
-#     y = []
-#     for t in targets:
-#         x.append(t[0])
-#         y.append(t[1])
-#     ax.scatter(x, y, label='targets')
-#
-#     # Plot Robot Positions
-#     x = []
-#     y = []
-#     all_nodes = nx.get_node_attributes(filternetwork.network, 'node')
-#     for n, node in all_nodes.items():
-#         # pos = node.position
-#         pos = node.node_positions[i]
-#         radius = node.fov
-#         p = plt.Circle(pos, radius, alpha=0.2, color='blue')
-#         ax.add_patch(p)
-#
-#         # Plot Predicted Positions After Consensus
-#         for t in node.consensus_positions[i]:
-#             x.append(t[0][0])
-#             y.append(t[1][0])
-#     ax.scatter(x, y, label='estimates')
-#
-#     plt.legend()
-#     plt.savefig('test/{i}.png'.format(i=i))
-#     plt.clf()
-#
-# """
-# Plot Errors, Covariance, OSPA
-# """
-# time = []
-# error = []
-# max_trace_cov = []
-# ospa = []
-# nmse_card = []
-# for t in generator.observations.keys():
-#     time.append(t)
-#     error.append(filternetwork.errors[t])
-#     max_trace_cov.append(filternetwork.max_trace_cov[t])
-#     ospa.append(filternetwork.gospa[t])
-#     nmse_card.append(filternetwork.nmse_card[t])
-#
-# plt.plot(time, error, label='error')
-# plt.legend()
-# plt.savefig('test/_errors.png')
-# plt.clf()
-#
-# plt.plot(time, max_trace_cov, label='max_tr_cov')
-# plt.legend()
-# plt.savefig('test/_max_tr_cov.png')
-# plt.clf()
-#
-# plt.plot(time, ospa, label='ospa')
-# plt.legend()
-# plt.savefig('test/_ospa.png')
-# plt.clf()
-#
-# plt.plot(time, nmse_card, label='nmse_card')
-# plt.legend()
-# plt.savefig('test/_nmse_card.png')
-# plt.clf()
-
-
-
+        filternetwork.save_topologies(trial_name + '/topologies')

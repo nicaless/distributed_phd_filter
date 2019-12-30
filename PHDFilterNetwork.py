@@ -589,19 +589,23 @@ class PHDFilterNetwork:
     def save_metrics(self, path):
         # Save Errors
         errors = pd.DataFrame.from_dict(self.errors, orient='index')
-        errors.to_csv(path + '/errors.csv')
+        errors.columns = ['value']
+        errors.to_csv(path + '/errors.csv', index_label='time')
 
         # Save Max Trace Cov
         max_tr_cov = pd.DataFrame.from_dict(self.max_trace_cov, orient='index')
-        max_tr_cov.to_csv(path + '/max_tr_cov.csv')
+        max_tr_cov.columns = ['value']
+        max_tr_cov.to_csv(path + '/max_tr_cov.csv', index_label='time')
 
         # Save OSPA
         ospa = pd.DataFrame.from_dict(self.gospa, orient='index')
-        ospa.to_csv(path + '/ospa.csv')
+        ospa.columns = ['value']
+        ospa.to_csv(path + '/ospa.csv', index_label='time')
 
         # Save NMSE
         nmse = pd.DataFrame.from_dict(self.nmse_card, orient='index')
-        nmse.to_csv(path + '/nmse.csv')
+        nmse.columns = ['value']
+        nmse.to_csv(path + '/nmse.csv', index_label='time')
 
     def save_estimates(self, path):
         all_nodes = nx.get_node_attributes(self.network, 'node')
@@ -639,6 +643,11 @@ class PHDFilterNetwork:
         data = data.transpose()
         data.columns = ['time', 'x', 'y', 'z', 'fov_radius', 'node_id']
         data.to_csv(path + '/robot_positions.csv', index=False)
+
+    def save_topologies(self, path):
+        for t, a in self.adjacencies.items():
+            np.savetxt(path + '/{t}.csv'.format(t=t),
+                       a, delimiter=',')
 
 
 
