@@ -1,5 +1,6 @@
 from copy import deepcopy
 import numpy as np
+import platform
 
 
 def generate_coords(new_config, current_coords, fov, target_estimate,
@@ -20,6 +21,11 @@ def generate_coords(new_config, current_coords, fov, target_estimate,
     :param steps: simulated annealing steps
     :return:
     """
+
+    if platform.system() == 'Linux':
+        invalid_iters_limit = 10
+    else:
+        invalid_iters_limit = 5
 
     # Simulated Annealing
     H = np.logspace(1, 3, steps)
@@ -51,7 +57,7 @@ def generate_coords(new_config, current_coords, fov, target_estimate,
                                      safe_dist, connect_dist, bbox)
         if not valid_config:
             invalid_configs = invalid_configs + 1
-        if invalid_configs > 5:
+        if invalid_configs > invalid_iters_limit:
             print('could not find valid config')
             return False
 

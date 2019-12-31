@@ -1,3 +1,4 @@
+import argparse
 from copy import deepcopy
 import networkx as nx
 import pandas as pd
@@ -16,12 +17,22 @@ np.random.seed(42)
 """
 Params
 """
-fail_int = [i for i in range(50) if i in [10]]
-num_nodes = 3
-pos_start = np.array([-25, 0, 20])
-pos_init_dist = 25
+parser = argparse.ArgumentParser()
+parser.add_argument('num', type=int, default=3)
+parser.add_argument('run_name', default='3_nodes')
+args = parser.parse_args()
+
+num_nodes = args.num
+run_name = args.run_name
+
+fail_int = [10]
+x_start = -50 + (100.0 / (num_nodes + 1))
+pos_start = np.array([x_start, 0, 20])
+pos_init_dist = np.floor(100.0 / (num_nodes + 1))
 fov = 20  # radius of FOV
-run_name = '3_nodes'
+noise_mult = [1, 5, 10]
+
+
 
 
 """
@@ -36,7 +47,7 @@ if not os.path.exists(run_name):
 Generate Data
 """
 generator = SimGenerator(5, init_targets=[Target()])
-generator.generate(50)
+generator.generate(20)
 generator.save_data(run_name)
 
 
@@ -88,62 +99,70 @@ for i in range(num_nodes):
 For Loop for all Simulations
 """
 saved_fail_sequence = None
-for how in ['arith', 'geom']:
-    for opt in ['agent', 'greedy', 'team']:
-        if opt == 'team':
-            mydir = 'misdp_data/inverse_covariance_matrices'
-            # Clear Out Old MISDP Data
-            filelist = [f for f in os.listdir(mydir) if f.endswith(".csv")]
-            for f in filelist:
-                os.remove(os.path.join(mydir, f))
-            if os.path.exists('misdp_data/adj_mat.csv'):
-                os.remove('misdp_data/adj_mat.csv')
-            if os.path.exists('misdp_data/new_A.csv'):
-                os.remove('misdp_data/new_A.csv')
+for noise in noise_mult:
+    for how in ['arith', 'geom']:
+        for opt in ['base', 'agent', 'greedy', 'team']:
+            if opt == 'team':
+                mydir = 'misdp_data/inverse_covariance_matrices'
+                # Clear Out Old MISDP Data
+                filelist = [f for f in os.listdir(mydir) if f.endswith(".csv")]
+                for f in filelist:
+                    os.remove(os.path.join(mydir, f))
+                if os.path.exists('misdp_data/adj_mat.csv'):
+                    os.remove('misdp_data/adj_mat.csv')
+                if os.path.exists('misdp_data/new_A.csv'):
+                    os.remove('misdp_data/new_A.csv')
 
-        trial_name = run_name + '/{h}_{o}'.format(h=how, o=opt)
-        print(trial_name)
+            trial_name = run_name + '/{noise}_{h}_{o}'.format(noise=noise,
+                                                              h=how,
+                                                              o=opt)
+            print(trial_name)
 
-        filternetwork = PHDFilterNetwork(deepcopy(node_attrs),
-                                         deepcopy(weight_attrs),
-                                         deepcopy(G))
-
-        """
-        Run Simulation
-        """
-        if how == 'arith' and opt == 'agent':
-            filternetwork.step_through(generator.observations,
-                                       generator.true_positions,
-                                       how=how,
-                                       opt=opt,
-                                       fail_int=fail_int)
+            filternetwork = PHDFilterNetwork(deepcopy(node_attrs),
+                                             deepcopy(weight_attrs),
+                                             deepcopy(G))
 
             """
-            Save Fail Sequence
+            Run Simulation
             """
-            rpd_folder = run_name + '/fail_sequence'
-            for i, vals in filternetwork.failures.items():
-                rpd_filename = rpd_folder + '/{i}.csv'.format(i=i)
-                np.savetxt(rpd_filename, vals[1], delimiter=",")
-            df = pd.DataFrame.from_dict(filternetwork.failures, orient='index')
-            df[[0]].to_csv(rpd_folder + '/_node_list.csv', header=None)
-            saved_fail_sequence = filternetwork.failures
-        else:
-            filternetwork.step_through(generator.observations,
-                                       generator.true_positions,
-                                       how=how,
-                                       opt=opt,
-                                       fail_int=saved_fail_sequence)
+            base = opt == 'base'
+            if how == 'arith' and opt == 'base':
+                filternetwork.step_through(generator.observations,
+                                           generator.true_positions,
+                                           how=how,
+                                           opt=opt,
+                                           fail_int=fail_int,
+                                           base=base,
+                                           noise_mult=noise)
 
-        """
-        Save Data
-        """
-        if not os.path.exists(trial_name):
-            os.makedirs(trial_name)
-            os.makedirs(trial_name + '/3ds')
-            os.makedirs(trial_name + '/overhead')
-            os.makedirs(trial_name + '/topologies')
-        filternetwork.save_metrics(trial_name)
-        filternetwork.save_estimates(trial_name)
-        filternetwork.save_positions(trial_name)
-        filternetwork.save_topologies(trial_name + '/topologies')
+                """
+                Save Fail Sequence
+                """
+                rpd_folder = run_name + '/fail_sequence'
+                for i, vals in filternetwork.failures.items():
+                    rpd_filename = rpd_folder + '/{i}.csv'.format(i=i)
+                    np.savetxt(rpd_filename, vals[1], delimiter=",")
+                df = pd.DataFrame.from_dict(filternetwork.failures, orient='index')
+                df[[0]].to_csv(rpd_folder + '/_node_list.csv', header=None)
+                saved_fail_sequence = filternetwork.failures
+            else:
+                filternetwork.step_through(generator.observations,
+                                           generator.true_positions,
+                                           how=how,
+                                           opt=opt,
+                                           fail_int=saved_fail_sequence,
+                                           base=base,
+                                           noise_mult=noise)
+
+            """
+            Save Data
+            """
+            if not os.path.exists(trial_name):
+                os.makedirs(trial_name)
+                os.makedirs(trial_name + '/3ds')
+                os.makedirs(trial_name + '/overhead')
+                os.makedirs(trial_name + '/topologies')
+            filternetwork.save_metrics(trial_name)
+            filternetwork.save_estimates(trial_name)
+            filternetwork.save_positions(trial_name)
+            filternetwork.save_topologies(trial_name + '/topologies')

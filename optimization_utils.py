@@ -2,6 +2,7 @@ import csv
 import numpy as np
 import os
 import picos as pic
+import platform
 
 
 def agent_opt(adj_mat, current_weights, covariance_data, ne=1, failed_node=None):
@@ -85,7 +86,11 @@ def team_opt(adj_mat, current_weights, covariance_matrices, ne=1):
         f_name = 'misdp_data/inverse_covariance_matrices/{c}.csv'
         np.savetxt(f_name.format(c=c), np.asarray(cov), delimiter=",")
     np.savetxt('misdp_data/adj_mat.csv', A, delimiter=",")
-    matlab_string = '/Applications/MATLAB_R2019a.app/bin/matlab -nodesktop -nosplash -r "MISDP_new_copy({e});exit;"'.format(
+    if platform.system() == 'Linux':
+        mat_command = 'matlab '
+    else:
+        mat_command = '/Applications/MATLAB_R2019a.app/bin/matlab '
+    matlab_string = mat_command + '-nodesktop -nosplash -r "MISDP_new_copy({e});exit;"'.format(
         e=ne)
     os.system(matlab_string)
     if os.path.exists('misdp_data/fail.txt'):

@@ -39,7 +39,8 @@ class PHDFilterNetwork:
 
     def step_through(self, measurements, true_targets,
                      L=3, how='geom', opt='agent',
-                     fail_int=None, fail_sequence=None):
+                     fail_int=None, fail_sequence=None,
+                     base=False, noise_mult=1):
         nodes = nx.get_node_attributes(self.network, 'node')
         if not isinstance(measurements, dict):
             measurements = {0: measurements}
@@ -50,7 +51,7 @@ class PHDFilterNetwork:
                 if fail_int is not None:
                     if i in fail_int:
                         failure = True
-                        fail_node = self.apply_failure(i)
+                        fail_node = self.apply_failure(i, mult=noise_mult)
                 else:
                     if i in fail_sequence:
                         failure = True
@@ -79,7 +80,7 @@ class PHDFilterNetwork:
                                                            true_targets[i])
             c_data, c_tr, c_inv_tr = self.get_covariance_trace(covariance_matrix,
                                                                how=how)
-            if failure:
+            if failure and not base:
                 A = self.adjacency_matrix()
                 current_coords = {nid: n.position for nid, n in nodes.items()}
                 fov = {nid: n.fov for nid, n in nodes.items()}
@@ -135,7 +136,7 @@ class PHDFilterNetwork:
             self.adjacencies[i] = self.adjacency_matrix()
             self.weighted_adjacencies[i] = self.weighted_adjacency_matrix()
 
-    def apply_failure(self, i, fail=None):
+    def apply_failure(self, i, fail=None, mult=1):
         nodes = nx.get_node_attributes(self.network, 'node')
 
         # Generate new R
@@ -146,7 +147,7 @@ class PHDFilterNetwork:
             R = nodes[fail_node].R
 
             r_mat_size = R.shape[0]
-            r = scipy.random.rand(r_mat_size, r_mat_size)
+            r = scipy.random.rand(r_mat_size, r_mat_size) * mult
             rpd = np.dot(r, r.T)
         else:
             fail_node = fail[0]
