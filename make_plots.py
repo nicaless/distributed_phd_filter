@@ -40,14 +40,37 @@ for noise in noise_mult:
         base = None
         for how in ['arith', 'geom']:
             for opt in ['base', 'agent', 'greedy', 'team']:
-                fname = run_name + '/{h}_{o}/{m}.csv'.format(h=how, o=opt, m=m)
+                fname = run_name + '/{n}_{h}_{o}/{m}.csv'.format(n=noise,
+                                                                 h=how, o=opt,
+                                                                 m=m)
                 data = pd.read_csv(fname)
                 plt.plot(data['time'], data['value'],
                          label='{h}_{o}'.format(h=how, o=opt))
         plt.legend()
         plt.title(m)
-        plt.savefig(run_name + '/{m}.png'.format(m=m), bbox_inches='tight')
+        plt.savefig(run_name + '/{n}_{m}.png'.format(n=noise,
+                                                     m=m), bbox_inches='tight')
         plt.clf()
+
+topology_dir = run_name + '/' + trial_name + '/topologies'
+edge_list = {}
+num_drones = 0
+timesteps = 20
+for t in range(int(timesteps)):
+    edge_list[t] = []
+    new_A = []
+    f_name = '{dir}/{t}.csv'.format(dir=topology_dir, t=t)
+    with open(f_name, 'r') as f:
+        readCSV = csv.reader(f, delimiter=',')
+        for row in readCSV:
+            data = list(map(float, row))
+            new_A.append(data)
+    new_A = np.array(new_A)
+    num_drones = new_A.shape[0]
+    for i in range(num_drones):
+        for j in range(i + 1, num_drones):
+            if new_A[i, j] == 1:
+                edge_list[t].append((i, j))
 
 """
 Read in Data for Drone Plots
@@ -62,25 +85,6 @@ if trial_name is not None:
 
     node_positions = pd.read_csv(run_name + '/' + trial_name +
                                  '/robot_positions.csv')
-
-    topology_dir = run_name + '/' + trial_name + '/topologies'
-    edge_list = {}
-    num_drones = 0
-    for t in range(int(timesteps)):
-        edge_list[t] = []
-        new_A = []
-        f_name = '{dir}/{t}.csv'.format(dir=topology_dir, t=t)
-        with open(f_name, 'r') as f:
-            readCSV = csv.reader(f, delimiter=',')
-            for row in readCSV:
-                data = list(map(float, row))
-                new_A.append(data)
-        new_A = np.array(new_A)
-        num_drones = new_A.shape[0]
-        for i in range(num_drones):
-            for j in range(i + 1, num_drones):
-                if new_A[i, j] == 1:
-                    edge_list[t].append((i, j))
 
 
     """
