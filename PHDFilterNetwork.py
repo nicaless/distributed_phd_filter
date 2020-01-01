@@ -99,7 +99,15 @@ class PHDFilterNetwork:
                     A[fail_node, best_node] = 1
                     new_metro_weights = True
                 else:
-                    A, new_weights = team_opt(A, weights, covariance_matrix)
+                    if how == 'geom':
+                        inv_cov_mat = []
+                        for c in covariance_matrix:
+                            inv_cov_mat.append(np.linalg.inv(c))
+                        A, new_weights = team_opt(A, weights, inv_cov_mat)
+                    else:
+                        A, new_weights = team_opt(A, weights, covariance_matrix)
+
+                    # A, new_weights = team_opt2(A, weights, covariance_matrix)
 
                 G = nx.from_numpy_matrix(A)
                 self.network = G

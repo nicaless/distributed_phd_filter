@@ -35,12 +35,12 @@ args = parser.parse_args()
 num_nodes = args.num
 run_name = args.run_name
 
-fail_int = [10]
+fail_int = [5, 10, 15, 20, 25, 30]
 x_start = -50 + (100.0 / (num_nodes + 1))
 pos_start = np.array([x_start, 0, 20])
 pos_init_dist = np.floor(100.0 / (num_nodes + 1))
 fov = 20  # radius of FOV
-noise_mult = [1, 5, 10]
+noise_mult = [1, 1, 1, 1, 1]
 
 
 
@@ -57,7 +57,7 @@ if not os.path.exists(run_name):
 Generate Data
 """
 generator = SimGenerator(5, init_targets=[Target()])
-generator.generate(20)
+generator.generate(35)
 generator.save_data(run_name)
 
 
@@ -109,9 +109,10 @@ for i in range(num_nodes):
 For Loop for all Simulations
 """
 saved_fail_sequence = None
-for noise in noise_mult:
+for noise in range(len(noise_mult)):
     for how in ['arith', 'geom']:
-        for opt in ['base', 'agent', 'greedy', 'team']:
+        # for opt in ['base', 'agent', 'greedy', 'team']:
+        for opt in ['base', 'agent', 'greedy']:
             if opt == 'team':
                 mydir = 'misdp_data/inverse_covariance_matrices'
                 # Clear Out Old MISDP Data
@@ -145,7 +146,7 @@ for noise in noise_mult:
                                            opt=opt,
                                            fail_int=fail_int,
                                            base=base,
-                                           noise_mult=noise)
+                                           noise_mult=noise_mult[noise])
 
                 """
                 Save Fail Sequence
@@ -164,7 +165,7 @@ for noise in noise_mult:
                                            opt=opt,
                                            fail_int=saved_fail_sequence,
                                            base=base,
-                                           noise_mult=noise)
+                                           noise_mult=noise_mult[noise])
 
             """
             Save Data

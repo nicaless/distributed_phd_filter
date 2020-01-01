@@ -112,6 +112,7 @@ function [A, PI] = MISDP_new_copy(ne)
 
     try
         % solve the problem
+        disp('solving');
         sol = optimize(F,obj,options);
 
         % Analyze the solution

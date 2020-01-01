@@ -24,6 +24,7 @@ def generate_coords(new_config, current_coords, fov, target_estimate,
 
     if platform.system() == 'Linux':
         invalid_iters_limit = 10
+        steps = 10000
     else:
         invalid_iters_limit = 5
 
