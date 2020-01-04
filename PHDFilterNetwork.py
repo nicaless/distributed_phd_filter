@@ -110,10 +110,11 @@ class PHDFilterNetwork:
                     new_metro_weights = True
                 elif opt == 'random':
                     non_neighbors = list(nx.non_neighbors(self.network, fail_node))
-                    rand_node = np.random.choice(non_neighbors)
-                    A[rand_node, fail_node] = 1
-                    A[fail_node, rand_node] = 1
-                    new_metro_weights = True
+                    if len(non_neighbors) != 0:
+                        rand_node = np.random.choice(non_neighbors)
+                        A[rand_node, fail_node] = 1
+                        A[fail_node, rand_node] = 1
+                        new_metro_weights = True
                 else:
                     if how == 'geom':
                         inv_cov_mat = []
