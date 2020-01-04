@@ -90,7 +90,7 @@ class PHDFilterNetwork:
 
                 if opt == 'agent':
                     A, new_weights = agent_opt(A, weights, c_data,
-                                               failed_node=0)
+                                               failed_node=fail_node)
                 elif opt == 'greedy':
                     # trace of cov of non-neighbors
                     c_tr_copy = deepcopy(c_tr)
