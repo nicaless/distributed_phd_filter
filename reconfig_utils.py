@@ -5,7 +5,8 @@ import platform
 
 def generate_coords(new_config, current_coords, fov, target_estimate,
                     bbox=np.array([(-50, 50), (-50, 50), (10, 100)]),
-                    delta=10, safe_dist=10, connect_dist=25, k=-0.1, steps=1000):
+                    delta=10, safe_dist=10, connect_dist=25, k=-0.1, steps=1000,
+                    lax=True):
     """
     Uses Simulated Annealing to generate new coordinates given new config
 
@@ -60,7 +61,10 @@ def generate_coords(new_config, current_coords, fov, target_estimate,
             invalid_configs = invalid_configs + 1
         if invalid_configs > invalid_iters_limit:
             print('could not find valid config')
-            return False
+            if lax:
+                return new_coords
+            else:
+                return False
 
     return new_coords
 
