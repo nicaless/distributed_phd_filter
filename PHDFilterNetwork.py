@@ -34,6 +34,7 @@ class PHDFilterNetwork:
         self.weighted_adjacencies = {}
         self.errors = {}
         self.max_trace_cov = {}
+        self.mean_trace_cov = {}
         self.gospa = {}
         self.nmse_card = {}
 
@@ -138,6 +139,7 @@ class PHDFilterNetwork:
                 n.update_trackers(i, pre_consensus=False)
 
             self.max_trace_cov[i] = max(c_tr)
+            self.mean_trace_cov[i] = np.mean(c_tr)
             self.errors[i] = self.calc_errors(true_targets[i])
             self.gospa[i] = self.calc_ospa(true_targets[i])
             self.nmse_card[i] = self.calc_nmse_card(true_targets[i])
@@ -183,7 +185,10 @@ class PHDFilterNetwork:
             cov_tr.append(tr_cov)
             inv_cov_tr.append(tr_inv_cov)
             if how == 'geom':
+                if tr_inv_cov == 0:
+                    tr_inv_cov = 0.01 * np.random.random(1)[0]
                 d = tr_inv_cov
+
             else:
                 d = tr_cov
             if self.cardinality[n] == 0:
@@ -605,6 +610,11 @@ class PHDFilterNetwork:
         max_tr_cov = pd.DataFrame.from_dict(self.max_trace_cov, orient='index')
         max_tr_cov.columns = ['value']
         max_tr_cov.to_csv(path + '/max_tr_cov.csv', index_label='time')
+
+        # Save Mean Trace Cov
+        mean_tr_cov = pd.DataFrame.from_dict(self.mean_trace_cov, orient='index')
+        mean_tr_cov.columns = ['value']
+        mean_tr_cov.to_csv(path + '/mean_tr_cov.csv', index_label='time')
 
         # Save OSPA
         ospa = pd.DataFrame.from_dict(self.gospa, orient='index')
