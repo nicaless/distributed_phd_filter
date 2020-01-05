@@ -35,7 +35,7 @@ args = parser.parse_args()
 num_nodes = args.num
 run_name = args.run_name
 
-fail_int = [5, 10, 15, 20, 25, 30]
+fail_int = [5, 10, 15, 20, 25, 30, 35, 40, 45]
 x_start = -50 + (100.0 / (num_nodes + 1))
 pos_start = np.array([x_start, 0, 20])
 pos_init_dist = np.floor(100.0 / (num_nodes + 1))
@@ -57,7 +57,7 @@ if not os.path.exists(run_name):
 Generate Data
 """
 generator = SimGenerator(5, init_targets=[Target()])
-generator.generate(35)
+generator.generate(50)
 generator.save_data(run_name)
 
 
@@ -142,6 +142,7 @@ for noise in range(len(noise_mult)):
             if how == 'arith' and opt == 'base':
                 filternetwork.step_through(generator.observations,
                                            generator.true_positions,
+                                           L=num_nodes,
                                            how=how,
                                            opt=opt,
                                            fail_int=fail_int,
@@ -161,6 +162,7 @@ for noise in range(len(noise_mult)):
             else:
                 filternetwork.step_through(generator.observations,
                                            generator.true_positions,
+                                           L=num_nodes,
                                            how=how,
                                            opt=opt,
                                            fail_int=saved_fail_sequence,
