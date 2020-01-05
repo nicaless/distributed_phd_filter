@@ -24,7 +24,7 @@ mpl.rcParams.update(params)
 """
 Params
 """
-run_name = 'multi_fail_nosiman_redogeom'
+run_name = 'single_fail_node'
 
 node_dir_plot = '5_nodes'
 trial_name = node_dir_plot + '/1_arith_agent'
@@ -47,7 +47,7 @@ for m in ['errors', 'max_tr_cov', 'mean_tr_cov', 'ospa', 'nmse']:
     for n in [5, 6, 7]:
         for how in ['arith', 'geom']:
             base = None
-            for opt in ['base', 'agent', 'greedy', 'team']:
+            for opt in ['base', 'agent', 'greedy', 'random', 'team']:
                 if opt == 'team' and n > 7:
                     continue
                 for trial in range(5):
@@ -69,6 +69,14 @@ for m in ['errors', 'max_tr_cov', 'mean_tr_cov', 'ospa', 'nmse']:
                     if opt == 'base':
                         base = data['value'].values
                     else:
+                        if opt == 'team':
+                            # reset base for team
+                            team_base_dir = '{t}_{h}_base'.format(t=trial, h=how)
+                            dir = top_dir + '/' + node_dir + '/' + team_base_dir
+                            fname = dir + '/{m}.csv'.format(m=m)
+                            team_base_data = pd.read_csv(fname)
+                            base = team_base_data['value'].values
+
                         v = data['value'].values
                         diff = base - v
                         diffs.extend(diff)
@@ -77,7 +85,7 @@ for m in ['errors', 'max_tr_cov', 'mean_tr_cov', 'ospa', 'nmse']:
                         topology_dir = dir + '/topologies'
                         num_drones = n
                         num_possible_edges = (n * (n -1)) / 2
-                        for t in range(35):
+                        for t in range(50):
                             edge_count = 0
                             new_A = []
                             f_name = '{dir}/{t}.csv'.format(dir=topology_dir, t=t)
@@ -112,6 +120,7 @@ for m in ['errors', 'max_tr_cov', 'mean_tr_cov', 'ospa', 'nmse']:
         group_fail = tmp.groupby('failure_label').agg(agg_dict).reset_index()
         if m == 'max_tr_cov':
             group_fail['diff'] = group_fail['diff'].apply(lambda x: np.log(x))
+
         if c == 'arith_agent':
             lab = 'RCAMC'
         elif c == 'arith_greedy':
@@ -124,6 +133,11 @@ for m in ['errors', 'max_tr_cov', 'mean_tr_cov', 'ospa', 'nmse']:
             lab = 'GreedyGMC'
         elif c == 'geom_team':
             lab = 'TCGMC'
+        elif c == 'arith_random':
+            lab = 'RandomAMC'
+        else:
+            lab = 'RandomGMC'
+
         plt.scatter(group_fail['edge_density'], group_fail['diff'], label=lab)
 
     plt.hlines(0, 0.3, max(group_fail['edge_density']) + 0.1,
@@ -140,58 +154,76 @@ for m in ['errors', 'max_tr_cov', 'mean_tr_cov', 'ospa', 'nmse']:
 """
 Plot Time Series for Covariance, for n = 7
 """
-for n in [5, 6, 7]:
-    for how in ['arith', 'geom']:
-        for opt in ['agent', 'greedy', 'team']:
-            if opt == 'team':
-                top_dir = run_name + '_team'
-            else:
-                top_dir = run_name
-
-            time_val = []
-            data_val = []
-
-            for trial in range(5):
-                # Read Metric Data
-                node_dir = '{n}_nodes'.format(n=n)
-                trial_dir = '{t}_{h}_{o}'.format(t=trial,
-                                                 h=how,
-                                                 o=opt)
-                dir = top_dir + '/' + node_dir + '/' + trial_dir
-                fname = dir + '/max_tr_cov.csv'
-                data = pd.read_csv(fname)
-                data['value'] = data['value'].apply(lambda x: np.log(x))
-
-                if len(data_val) == 0:
-                    time_val.extend(data['time'].values)
-                    data_val.extend(data['value'].values)
+for agg in ['mean', 'max', 'ospa']:
+    for n in [5, 6, 7]:
+        for how in ['arith', 'geom']:
+            for opt in ['agent', 'greedy', 'random', 'team']:
+                if opt == 'team':
+                    top_dir = run_name + '_team'
                 else:
-                    data_val = data_val + data['value'].values
+                    top_dir = run_name
 
-            data_val = [v / 5.0 for v in data_val]
+                time_val = []
+                data_val = []
 
-            c = '{h}_{o}'.format(h=how, o=opt)
-            if c == 'arith_agent':
-                lab = 'RCAMC'
-            elif c == 'arith_greedy':
-                lab = 'GreedyAMC'
-            elif c == 'arith_team':
-                lab = 'TCAMC'
-            elif c == 'geom_agent':
-                lab = 'RCGMC'
-            elif c == 'geom_greedy':
-                lab = 'GreedyGMC'
-            elif c == 'geom_team':
-                lab = 'TCGMC'
+                for trial in range(5):
+                    # Read Metric Data
+                    node_dir = '{n}_nodes'.format(n=n)
+                    trial_dir = '{t}_{h}_{o}'.format(t=trial,
+                                                     h=how,
+                                                     o=opt)
+                    dir = top_dir + '/' + node_dir + '/' + trial_dir
+                    if agg == 'ospa':
+                        fname = dir + '/{agg}.csv'.format(agg=agg)
+                    else:
+                        fname = dir + '/{agg}_tr_cov.csv'.format(agg=agg)
+                    data = pd.read_csv(fname)
+                    if agg != 'ospa':
+                        data['value'] = data['value'].apply(lambda x: np.log(x))
 
-            plt.plot(time_val, data_val, label=lab)
+                    if len(data_val) == 0:
+                        time_val.extend(data['time'].values)
+                        data_val.extend(data['value'].values)
+                    else:
+                        data_val = data_val + data['value'].values
 
-    plt.legend()
-    plt.xlabel('Time')
-    plt.ylabel('Maximum Trace(P)')
-    plt.savefig('{n}_max_cov_trace_over_time.png'.format(n=n),
-                bbox_inches='tight')
-    plt.clf()
+                data_val = [v / 5.0 for v in data_val]
+
+                c = '{h}_{o}'.format(h=how, o=opt)
+                if c == 'arith_agent':
+                    lab = 'RCAMC'
+                elif c == 'arith_greedy':
+                    lab = 'GreedyAMC'
+                elif c == 'arith_team':
+                    lab = 'TCAMC'
+                elif c == 'geom_agent':
+                    lab = 'RCGMC'
+                elif c == 'geom_greedy':
+                    lab = 'GreedyGMC'
+                elif c == 'geom_team':
+                    lab = 'TCGMC'
+                elif c == 'arith_random':
+                    lab = 'RandomAMC'
+                elif c == 'geom_random':
+                    lab = 'RandomGMC'
+
+                plt.plot(time_val, data_val, label=lab)
+
+        plt.legend()
+        plt.xlabel('Time')
+        if agg == 'ospa':
+            plt.ylabel('OSPA')
+        else:
+            plt.ylabel('{agg} Trace(P)'.format(agg=agg))
+
+        if agg == 'ospa':
+            plt.savefig(
+                '{n}_ospa_over_time.png'.format(n=n), bbox_inches='tight')
+        else:
+            plt.savefig('{n}_{agg}_cov_trace_over_time.png'.format(n=n,
+                                                                   agg=agg),
+                        bbox_inches='tight')
+        plt.clf()
 
 
 
@@ -205,7 +237,7 @@ if trial_name is not None:
     topology_dir = run_name + '/' + trial_name + '/topologies'
     edge_list = {}
     num_drones = 0
-    timesteps = 35
+    timesteps = 50
     for t in range(int(timesteps)):
         edge_list[t] = []
         new_A = []
@@ -248,13 +280,27 @@ if trial_name is not None:
 
         # Plot Targets
         tp_tmp = true_positions[true_positions['time'] == t]
-        ax.scatter(tp_tmp['x'], tp_tmp['y'], tp_tmp['z'], color='black')
+        ax.scatter(tp_tmp['x'], tp_tmp['y'], s=20, color='black')
 
         # Plot Estimates
         e_tmp = estimates[estimates['time'] == t]
-        ax.scatter(e_tmp['x'], e_tmp['y'], e_tmp['z'], color='orange')
+        ax.scatter(e_tmp['x'], e_tmp['y'], s=20, color='orange')
 
         node_tmp = node_positions[node_positions['time'] == t]
+
+        # Plot Drones
+        ax.scatter(node_tmp['x'], node_tmp['y'], s=30, color='blue')
+
+        # Plot Adjacencies
+        for edge_index, edges in enumerate(edge_list[t]):
+            i = edges[0]
+            j = edges[1]
+            i_pos = node_tmp[node_tmp['node_id'] == i]
+            j_pos = node_tmp[node_tmp['node_id'] == j]
+
+            xl = [i_pos['x'].values[0], j_pos['x'].values[0]]
+            yl = [i_pos['y'].values[0], j_pos['y'].values[0]]
+            plt.plot(xl, yl, color='gray', alpha=0.3)
 
         # Plot FOVs
         for n in range(int(num_drones)):
@@ -319,3 +365,40 @@ if trial_name is not None:
                     trial_name + '/3ds/{t}.png'.format(t=t),
                     bbox_inches='tight')
         plt.clf()
+
+
+"""
+Plot Target True Positions
+"""
+
+# target_df = pd.read_csv(run_name + '/' + node_dir_plot + '/true_positions.csv')
+# target_df = target_df[target_df['time'] < 20]
+#
+# targets = {}
+# for i in range(20):
+#     tmp = target_df[target_df['time'] == i]
+#     count_targets = len(tmp['time'])
+#     for j in range(count_targets):
+#         if j not in targets:
+#             targets[j] = [(tmp['x'].iloc[j], tmp['y'].iloc[j])]
+#         else:
+#             targets[j].append((tmp['x'].iloc[j], tmp['y'].iloc[j]))
+#
+# print(targets)
+# ax = plt.axes()
+# plt.xlim((-50, 50))
+# plt.ylim((-50, 50))
+# for t, positions in targets.items():
+#     x = []
+#     y = []
+#     for p in positions:
+#         x.append(p[0])
+#         y.append(p[1])
+#     plt.scatter(x, y, s=10, label=t)
+#
+# plt.title('True Target Trajectory')
+# plt.legend()
+# plt.savefig('target_trajectory.png', bbox_inches='tight')
+
+
+
