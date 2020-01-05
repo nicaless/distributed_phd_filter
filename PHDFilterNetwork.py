@@ -89,8 +89,17 @@ class PHDFilterNetwork:
                 weights = nx.get_node_attributes(self.network, 'weights')
 
                 if opt == 'agent':
-                    A, new_weights = agent_opt(A, weights, c_data,
+                    c_data_new = []
+                    for c in c_data:
+                        new_c = np.log(c)
+                        if np.isnan(new_c) or np.isinf(new_c):
+                            c_data_new.append(0)
+                        else:
+                            c_data_new.append(new_c)
+                    print(c_data_new)
+                    A, new_weights = agent_opt(A, weights, c_data_new,
                                                failed_node=fail_node)
+                    # new_metro_weights = True
                 elif opt == 'greedy':
                     # trace of cov of non-neighbors
                     c_tr_copy = deepcopy(c_tr)
@@ -258,7 +267,7 @@ class PHDFilterNetwork:
             weighted_est = 0
             tot_est = {}
             for n2, weight in weights[n1].items():
-                est = sum([t.weight for t in nodes[n2].targets])
+                est = np.nansum([t.weight for t in nodes[n2].targets])
                 weighted_est += est * weight
                 tot_est[n2] = est
 
