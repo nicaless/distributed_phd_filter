@@ -61,8 +61,9 @@ generator.generate(20)
 generator.save_data(run_name)
 
 
+# TODO: birth model should only have weights in designated birth areas
 """
-Birth Models for entire space
+Birth Models for entire space 
 """
 birthgmm = []
 for x in range(-50, 50, 2):
