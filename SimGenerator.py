@@ -58,46 +58,50 @@ class SimGenerator:
         for i in range(num_birth):
             corner = np.random.choice([0, 1, 2, 3])
             if corner == 0:
-                new_target = Target(
-                    init_state=np.array([
-                        [self.region[0][0] + 10 * np.random.randn()],
-                        [self.region[1][0] + 10 * np.random.randn()],
-                        [0.1], [0.1]]))
+                draw_state = np.array([[self.region[0][0] + 10],
+                                       [self.region[1][0] + 10],
+                                       [0.1], [0.1]])
+                init_cov = np.diag((0.01, 0.01, 0.01, 0.01))
+                sample = np.random.multivariate_normal(draw_state.flat,
+                                                       init_cov, size=1)
+                init_state = np.array([[sample[0][0]], [sample[0][1]],
+                                       [sample[0][2]], [sample[0][3]]])
+
+                new_target = Target(init_state=init_state)
             elif corner == 1:
-                new_target = Target(
-                    init_state=np.array([
-                        [self.region[0][0] + 10 * np.random.randn()],
-                        [self.region[1][1] + 10 * np.random.randn()],
-                        [0.1], [0.1]]),
-                    dt_2=-1)
+                draw_state = np.array([[self.region[0][0] + 10],
+                                       [self.region[1][1] - 10],
+                                       [0.1], [0.1]])
+                init_cov = np.diag((0.01, 0.01, 0.01, 0.01))
+                sample = np.random.multivariate_normal(draw_state.flat,
+                                                           init_cov, size=1)
+                init_state = np.array([[sample[0][0]], [sample[0][1]],
+                                       [sample[0][2]], [sample[0][3]]])
+                new_target = Target(init_state=init_state, dt_2=-1)
             elif corner == 2:
-                new_target = Target(
-                    init_state=np.array(
-                        [[self.region[0][1] + 10 * np.random.randn()],
-                         [self.region[1][1] + 10 * np.random.randn()],
-                         [0.1], [0.1]]),
-                    dt_1=-1, dt_2=-1)
+                draw_state = np.array([[self.region[0][1] - 10],
+                                       [self.region[1][1] - 10],
+                                       [0.1], [0.1]])
+                init_cov = np.diag((0.01, 0.01, 0.01, 0.01))
+                sample = np.random.multivariate_normal(draw_state.flat,
+                                                       init_cov, size=1)
+                init_state = np.array([[sample[0][0]], [sample[0][1]],
+                                       [sample[0][2]], [sample[0][3]]])
+                new_target = Target(init_state=init_state,
+                                    dt_1=-1, dt_2=-1)
             else:
-                new_target = Target(
-                    init_state=np.array(
-                        [[self.region[0][1] + 10 * np.random.randn()],
-                         [self.region[1][0] + 10 * np.random.randn()],
-                         [0.1], [0.1]]),
-                    dt_1=-1)
+                draw_state = np.array([[self.region[0][1] - 10],
+                                       [self.region[1][0] + 10],
+                                       [0.1], [0.1]])
+                init_cov = np.diag((0.01, 0.01, 0.01, 0.01))
+                sample = np.random.multivariate_normal(draw_state.flat,
+                                                           init_cov, size=1)
+                init_state = np.array([[sample[0][0]], [sample[0][1]],
+                                       [sample[0][2]], [sample[0][3]]])
+                new_target = Target(init_state=init_state, dt_1=-1)
 
             next_timestep_targets.append(new_target)
             true_positions.append(new_target.get_measurement())
-
-        # Random Uniform Birth
-        # x = np.random.random()
-        # if x < self.birth_prob:
-        #     x = np.random.uniform(low=self.region[0][0],
-        #                           high=self.region[0][1])
-        #     y = np.random.uniform(low=self.region[1][0],
-        #                           high=self.region[1][1])
-        #     new_target = Target(init_state=np.array([[x], [y], [0.1], [0.0]]))
-        #     next_timestep_targets.append(new_target)
-        #     true_positions.append(new_target.get_measurement())
 
         # TODO: move this to FilterNode object
         # num_clutter = np.random.poisson(self.clutter_lambda)

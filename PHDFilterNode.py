@@ -2,6 +2,7 @@ from copy import deepcopy
 import math
 import numpy as np
 from operator import attrgetter
+from scipy.spatial.distance import mahalanobis
 
 from target import Target
 
@@ -11,10 +12,10 @@ class PHDFilterNode:
                  node_id,
                  birthgmm,
                  prune_thresh=1e-6,
-                 merge_thresh=5,
+                 merge_thresh=0.2,
                  max_comp=100,
-                 # clutter_rate=5,
-                 clutter_rate=0,
+                 clutter_rate=5,
+                 # clutter_rate=0,
                  position=np.array([0, 0, 0]),
                  region=[(-50, 50), (-50, 50)]
                  ):
@@ -51,6 +52,9 @@ class PHDFilterNode:
         # merged results
         self.merged_targets = []
 
+        # reweighted results
+        self.reweighted_targets = []
+
         # TRACKERS
         self.observations = {}
         self.node_positions = {}
@@ -71,17 +75,14 @@ class PHDFilterNode:
 
     def predict(self):
         # Existing Targets
-        updated = [deepcopy(t) for t in self.targets
-                   if not self.check_measure_oob(t.state)]
+        updated = [deepcopy(t) for t in self.targets]
         for t in updated:
             t.next_state()
             t.weight = t.weight * self.survival_prob
-        keep_updated = [t for t in updated
-                        if not self.check_measure_oob(t.state)]
+        keep_updated = [t for t in updated]
 
         # new born targets
-        born = [deepcopy(t) for t in self.birthgmm
-                if not self.check_measure_oob(t.state)]
+        born = [deepcopy(t) for t in self.birthgmm]
         for b in born:
             b.weight = b.weight / float(len(born))
 
@@ -101,7 +102,6 @@ class PHDFilterNode:
         pass
 
     def update(self, measurements):
-        # TODO: Add clutter to measurements
         self.measurements = measurements
 
         # Create Update Components
@@ -164,37 +164,17 @@ class PHDFilterNode:
 
         return x_out_of_bounds or y_out_of_bounds
 
+    def get_mahalanobis(self, target1, target2):
+        d = mahalanobis(target1.state, target2.state,
+                        np.linalg.inv(target1.state_cov))
+        return d
+
     def prune(self):
-        # prunedgmm = list(filter(lambda comp: comp.weight > self.prune_thresh,
-        #                         self.updated_targets))
-
-        # Prune Targets w/ same state as previous time step or w/ low weight
-        prunedgmm = []
-        for t in self.updated_targets:
-            if t.weight > self.prune_thresh:
-                state_history = t.all_states
-                if len(state_history) == 1:
-                    prunedgmm.append(t)
-                else:
-                    curr_state = t.state
-                    prev_state = state_history[-2]
-                    if np.allclose(curr_state, prev_state, rtol=1, atol=1):
-                        continue
-                    if curr_state[0][0] > prev_state[0][0]:
-                        dt_1 = 1
-                    else:
-                        dt_1 = -1
-                    if curr_state[1][0] > prev_state[1][0]:
-                        dt_2 = 1
-                    else:
-                        dt_2 = -1
-                    t.set_dir(dt_1, dt_2)
-                    prunedgmm.append(t)
-
+        prunedgmm = list(filter(lambda comp: comp.weight > self.prune_thresh,
+                                self.updated_targets))
         self.pruned_targets = prunedgmm
 
     def merge(self):
-        weightsums = sum([comp.weight for comp in self.updated_targets])
         sourcegmm = [deepcopy(comp) for comp in self.pruned_targets]
         newgmm = []
 
@@ -205,16 +185,9 @@ class PHDFilterNode:
             weightiest = sourcegmm[w]
             del sourcegmm[w]
 
-            # Find all nearby components and delete
-            # distances = [float(
-            #     np.dot(
-            #         np.dot((comp.state - weightiest.state).T,
-            #                np.linalg.inv(comp.state_cov)),
-            #         comp.state - weightiest.state))
-            #     for comp in sourcegmm]
-            distances = [math.hypot(comp.state[0][0] - weightiest.state[0][0],
-                                    comp.state[1][0] - weightiest.state[1][0]
-                                    ) for comp in sourcegmm]
+            # Find all nearby components to merge with
+            distances = [self.get_mahalanobis(comp, weightiest)
+                         for comp in sourcegmm]
 
             tosubsume = np.array([d <= self.merge_thresh for d in distances])
             subsumed = [weightiest]
@@ -224,8 +197,6 @@ class PHDFilterNode:
 
             # Create new component from subsumed components
             newcomp_weight = sum([comp.weight for comp in subsumed])
-            # newcomp_dt_1 = ss.mode([comp.dt_1 for comp in subsumed])[0][0]
-            # newcomp_dt_2 = ss.mode([comp.dt_2 for comp in subsumed])[0][0]
 
             newcomp_state = np.sum(
                 np.array([
@@ -250,21 +221,25 @@ class PHDFilterNode:
         # Keep no more than max components
         newgmm.sort(key=attrgetter('weight'), reverse=True)
         self.merged_targets = newgmm[:self.max_components]
+
+    def reweight(self):
+        weightsums = sum([comp.weight for comp in self.updated_targets])
         newweightsum = sum([comp.weight for comp in self.merged_targets])
+        self.reweighted_targets = [deepcopy(comp)
+                                   for comp in self.merged_targets]
         if newweightsum > 0:
             weightnorm = float(weightsums) / newweightsum
-            for comp in newgmm:
+            for comp in self.reweighted_targets:
                 comp.weight *= weightnorm
-        self.merged_targets = newgmm
 
-    # TODO: add a reset
     def step_through(self, measurements, measurement_id=0):
         if not isinstance(measurements, dict):
             self.predict()
             self.update(measurements)
             self.prune()
             self.merge()
-            self.targets = self.merged_targets
+            self.reweight()
+            self.targets = self.reweighted_targets
             self.update_trackers(measurement_id)
         else:
             for i, m in measurements.items():
@@ -272,7 +247,8 @@ class PHDFilterNode:
                 self.update(m)
                 self.prune()
                 self.merge()
-                self.targets = self.merged_targets
+                self.reweight()
+                self.targets = self.reweighted_targets
                 self.update_trackers(i)
 
     def update_trackers(self, i, pre_consensus=True):
