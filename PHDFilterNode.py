@@ -164,7 +164,8 @@ class PHDFilterNode:
 
         return x_out_of_bounds or y_out_of_bounds
 
-    def get_mahalanobis(self, target1, target2):
+    @staticmethod
+    def get_mahalanobis(target1, target2):
         d = mahalanobis(target1.state, target2.state,
                         np.linalg.inv(target1.state_cov))
         return d

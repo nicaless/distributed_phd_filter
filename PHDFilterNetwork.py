@@ -4,6 +4,7 @@ import numpy as np
 from operator import attrgetter
 import pandas as pd
 import scipy
+from scipy.spatial.distance import mahalanobis
 
 from optimization_utils import *
 from ospa import *
@@ -16,15 +17,39 @@ class PHDFilterNetwork:
                  nodes,
                  weights,
                  G,
-                 region=[(-50, 50), (-50, 50)]
-                 ):
+                 merge_thresh=0.2):
         self.network = G
         nx.set_node_attributes(self.network, nodes, 'node')
         nx.set_node_attributes(self.network, weights, 'weights')
-        self.region = region
         self.target_estimates = []
 
+        """
+        Dictionary of form {node_id : components} which indicates which 
+        components belonging to node_id to share with neighbors 
+        """
         self.node_share = {}
+
+        """
+        Dictionary of form {node_id : {neighbor_id: components}} which 
+        indicates which components of neihbor_id were shared with node_id 
+        """
+        self.node_neighbor_comps = {}
+
+        """
+        Dictionary of form {node_id : {comp_id: components}} which 
+        indicates which components to fuse with the comp_id of node_id 
+        """
+        self.node_fuse_comps = {}
+
+        """
+        Dictionary of form {node_id : {comp_id: weights}} which indicates 
+        which weights to use when fusiing components in self.node_fuse_comps 
+        with comp_id of node_id 
+        """
+        self.node_fuse_weights = {}
+
+        self.merge_thresh = merge_thresh
+
         self.cardinality = {}
         self.node_keep = {}
 
@@ -37,6 +62,11 @@ class PHDFilterNetwork:
         self.mean_trace_cov = {}
         self.gospa = {}
         self.nmse_card = {}
+
+
+    """
+    Simulation Operations
+    """
 
     def step_through(self, measurements, true_targets,
                      L=3, how='geom', opt='agent',
@@ -521,42 +551,203 @@ class PHDFilterNetwork:
 
         return new_alphas
 
-    @staticmethod
-    def calcK(comp_id, all_comps, new_covs, new_states):
-        # Kappa 1:n
-        firstterm_1n = len(all_comps) * 4 * np.log(2 * np.pi)
-        secondterm_1n = 0
-        thirdterm_1n = 0
+    """
+    Fusion Utils (for both Geometric and Arithmetic fusion)
+    """
 
-        # Kappa n
-        firstterm_n = 4 * np.log(2 * np.pi)
-        secondterm_n = 0
-        thirdterm_n = np.dot(np.dot(new_states[comp_id].T, new_covs[comp_id]),
-                             new_states[comp_id])
+    def get_comps_to_fuse(self, node_id):
+        """
+        Updates the dictionaries self.node_fuse_comps and
+        self.node_fuse_weights to aid fusion
 
-        for i in range(len(all_comps)):
-            c = all_comps[i]
-            weight = c[0]
-            state = c[1].state
-            cov = c[1].state_cov
-            # cov = np.eye(cov.shape[0]) * 10e-6
-            secondterm_1n += np.log(np.linalg.det(weight * np.linalg.inv(cov)))
-            thirdterm_1n += weight * np.dot(np.dot(state.T,
-                                                   np.linalg.inv(cov)),
-                                            state)
-            secondterm_n += np.linalg.det(weight * np.linalg.inv(cov))
+        :param node_id:
+        :return None:
+        """
 
-        kappa_1n = -0.5 * (firstterm_1n - secondterm_1n + thirdterm_1n)
-        kappa_n = -0.5 * (firstterm_n - np.log(secondterm_n) + thirdterm_n)
+        node_comps = self.node_share[node_id]['node_comps']
+        neighbor_comps = self.node_neighbor_comps[node_id]
 
-        K = np.exp(kappa_1n[0][0] - kappa_n[0][0])
-        return K
+        network_weights = nx.get_node_attributes(self.network, 'weights')
 
-    @staticmethod
-    def rescaler(cov, weight):
-        numer = np.linalg.det(2 * np.pi * np.linalg.inv(cov / weight))
-        denom = np.linalg.det(2 * np.pi * cov) ** weight
-        return (numer / denom) ** 0.5
+        node_weight = network_weights[node_id]
+
+        for i in range(len(node_comps)):
+            c0 = node_comps[i]
+
+            fuse_comps = [c0]
+            fuse_weights = [node_weight]
+            for neighbor_id, comps in neighbor_comps.items():
+                """
+                For each neighbor, find closest comp to node_comp[i]
+                within merge_thresh (using mahalanobis distance)
+                """
+                closest_comp = None
+                distances = [self.get_mahalanobis(c1, c0) for c1 in comps]
+                closest_comp_index = comps.index(min(distances))
+
+                if distances[closest_comp_index] <= self.merge_thresh:
+                    closest_comp = comps[closest_comp_index]
+
+                if closest_comp is not None:
+                    fuse_comps.append(closest_comp)
+                    fuse_weights.append(network_weights[neighbor_id])
+
+            self.node_fuse_comps[node_id][i] = fuse_comps
+            self.node_fuse_weights[node_id][i] = fuse_weights
+
+    """
+    Geometric Fusion
+    TODO:
+    order of ops
+    1) get sets of components to fuse
+    2) for each node
+    2a) get K for each set of components to be fused
+    2b) fuse covs
+    2c) fuse states
+    2d) fuse alphas
+    """
+
+    def get_k(self, node_id):
+        # TODO:
+        pass
+
+    def fuse_covs_geom(self, node_id):
+        """
+        For each component of node_id, fuse with the closest components from
+        neighboprs of node_id
+
+        :param node_id:
+        :return new covariances:
+        """
+
+        node_comps = self.node_share[node_id]['node_comps']
+
+        new_covs = []
+        for i in range(len(node_comps)):
+            fuse_comps = self.node_fuse_comps[node_id][i]
+            fuse_weights = self.node_fuse_weights[node_id][i]
+
+            if len(fuse_comps) == 1:
+                """
+                If nothing to fuse with component (no close enough 
+                components from neighbors to fuse) keep current covariance 
+                """
+                new_covs.append(node_comps[i].state_cov)
+            else:
+                """
+                Rescale weights to equal 1 if necessary
+                (only necessary if not all neighbors contributed)
+                """
+                sum_fuse_weights = float(sum(fuse_weights))
+                fuse_weights = [fw / sum_fuse_weights for fw in fuse_weights]
+
+                """
+                Fuse According to Geom Fusion in paper
+                """
+                fuse_comps_weighted = []
+                for j in range(len(fuse_comps)):
+                    w = fuse_weights[j]
+                    inv_cov = np.linalg.inv(fuse_comps[j].state_cov)
+                    fuse_comps_weighted.append(w * inv_cov)
+                sum_covs = np.sum(fuse_comps_weighted, 0)
+                new_covs.append(np.linalg.inv(sum_covs))
+
+        return new_covs
+
+    def fuse_states_geom(self, node_id, new_covs):
+        """
+        For each component of node_id, fuse with the closest components from
+        neighboprs of node_id
+
+        :param node_id:
+        :return new covariances:
+        """
+
+        node_comps = self.node_share[node_id]['node_comps']
+
+        new_states = []
+        for i in range(len(node_comps)):
+            fuse_comps = self.node_fuse_comps[node_id][i]
+            fuse_weights = self.node_fuse_weights[node_id][i]
+
+            if len(fuse_comps) == 1:
+                """
+                If nothing to fuse with component (no close enough 
+                components from neighbors to fuse) keep current state 
+                """
+                new_states.append(node_comps[i].state)
+            else:
+                """
+                Rescale weights to equal 1 if necessary
+                (only necessary if not all neighbors contributed)
+                """
+                sum_fuse_weights = float(sum(fuse_weights))
+                fuse_weights = [fw / sum_fuse_weights for fw in fuse_weights]
+
+                """
+                Fuse According to Geom Fusion in paper
+                """
+                fuse_comps_weighted = []
+                for j in range(len(fuse_comps)):
+                    w = fuse_weights[j]
+                    inv_cov = np.linalg.inv(fuse_comps[j].state_cov)
+                    x = fuse_comps[j].state
+                    fuse_comps_weighted.append(w * inv_cov * x)
+                sum_states = np.sum(fuse_comps_weighted, 0)
+                new_states.append(new_covs[i] * sum_states)
+
+        return new_states
+
+    def fuse_alphas_geom(self, node_id, K):
+        """
+        For each component of node_id, fuse with the closest components from
+        neighboprs of node_id
+
+        :param node_id:
+        :return new covariances:
+        """
+
+        node_comps = self.node_share[node_id]['node_comps']
+
+        new_alphas = []
+        for i in range(len(node_comps)):
+            fuse_comps = self.node_fuse_comps[node_id][i]
+            fuse_weights = self.node_fuse_weights[node_id][i]
+
+            if len(fuse_comps) == 1:
+                """
+                If nothing to fuse with component (no close enough 
+                components from neighbors to fuse) keep current alpha 
+                (component weight) 
+                """
+                new_alphas.append(node_comps[i].weight)
+            else:
+                """
+                Rescale weights to equal 1 if necessary
+                (only necessary if not all neighbors contributed)
+                """
+                sum_fuse_weights = float(sum(fuse_weights))
+                fuse_weights = [fw / sum_fuse_weights for fw in fuse_weights]
+
+                """
+                Fuse According to Geom Fusion in paper
+                """
+                fuse_comps_weighted = []
+                for j in range(len(fuse_comps)):
+                    w = fuse_weights[j]
+                    alpha = fuse_comps[j].weight
+                    alpha_w = alpha ** w
+                    r = self.rescaler(fuse_comps[j].state_cov, fuse_weights[j])
+                    fuse_comps_weighted.append(alpha_w * r)
+                prod_alpha = np.prod(fuse_comps_weighted, 0)
+                new_alphas.append(prod_alpha * K[i])
+
+        return new_alphas
+
+
+    """
+    Network Operations
+    """
 
     def adjacency_matrix(self):
         G = self.network
@@ -578,6 +769,10 @@ class PHDFilterNetwork:
                 A[n, neighbor] = weights[n][neighbor]
 
         return A
+
+    """
+    Metric Calculations
+    """
 
     def calc_errors(self, true_targets):
         nodes = nx.get_node_attributes(self.network, 'node')
@@ -624,6 +819,11 @@ class PHDFilterNetwork:
             sum_card += card
 
         return squared_error / (N * sum_card)
+
+
+    """
+    Saving Data
+    """
 
     def save_metrics(self, path):
         # Save Errors
@@ -692,6 +892,65 @@ class PHDFilterNetwork:
         for t, a in self.adjacencies.items():
             np.savetxt(path + '/{t}.csv'.format(t=t),
                        a, delimiter=',')
+
+    """
+    Static Methods
+    """
+
+    @staticmethod
+    def calcK(comps, weights):
+        # Omega and q
+        covs_weighted = []
+        states_weighted = []
+        for j in range(len(comps)):
+            w = weights[j]
+            inv_cov = np.linalg.inv(comps[j].state_cov)
+            x = comps[j].state
+            covs_weighted.append(w * inv_cov)
+            states_weighted.append(w * inv_cov * x)
+        omega = np.sum(covs_weighted, 0)
+        q = np.sum(states_weighted)
+
+        d = comps[0].state.shape[0]
+
+        # Kappa 1:n
+        firstterm_1n = len(comps) * d * np.log(2 * np.pi)
+        secondterm_1n = 0  # Fill in later
+        thirdterm_1n = 0  # Fill in later
+
+        # Kappa n
+        firstterm_n = d * np.log(2 * np.pi)
+        secondterm_n = 0  # Fill in later
+        thirdterm_n = np.dot(q.T, np.linalg.inv(omega), q)
+
+        for i in range(len(comps)):
+            weight = weights[i]
+            state = comps[i].state
+            cov = comps[i].state_cov
+
+            secondterm_1n += np.log(np.linalg.det(weight * np.linalg.inv(cov)))
+            thirdterm_1n += weight * state.T * np.linalg.inv(cov) * state
+
+            secondterm_n += np.linalg.det(weight * np.linalg.inv(cov))
+
+        kappa_1n = -0.5 * (firstterm_1n - secondterm_1n + thirdterm_1n)
+        kappa_n = -0.5 * (firstterm_n - np.log(secondterm_n) + thirdterm_n)
+
+        # TODO: check
+        K = np.exp(kappa_1n[0][0] - kappa_n[0][0])
+        return K
+
+    @staticmethod
+    def rescaler(cov, weight):
+        numer = np.linalg.det(2 * np.pi * np.linalg.inv(cov / weight))
+        denom = np.linalg.det(2 * np.pi * cov) ** weight
+        return (numer / denom) ** 0.5
+
+    @staticmethod
+    def get_mahalanobis(self, target1, target2):
+        d = mahalanobis(target1.state, target2.state,
+                        np.linalg.inv(target1.state_cov))
+        return d
 
 
 
