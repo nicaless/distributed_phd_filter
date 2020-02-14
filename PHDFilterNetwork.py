@@ -599,7 +599,7 @@ class PHDFilterNetwork:
     Geometric Fusion
     TODO:
     order of ops
-    1) get sets of components to fuse
+    1) get sets of components to fuse (self.get_comps_to_fuse)
     2) for each node
     2a) get K for each set of components to be fused
     2b) fuse covs
@@ -607,9 +607,55 @@ class PHDFilterNetwork:
     2d) fuse alphas
     """
 
+    def geometric_fusion(self, node_id):
+        """
+        PRE-REQUISITE: that you ran self.get_comps_to_fuse
+
+        :param node_id:
+        :return list of new components for node_i:
+        """
+
+        Ks = self.get_k(node_id)
+        covs = self.fuse_covs_geom(node_id)
+        states = self.fuse_states_geom(node_id, covs)
+        alphas = self.fuse_alphas_geom(node_id, Ks)
+
+        fuse_comps = []
+        # TODO: create the actual components
+
+        return fuse_comps
+
     def get_k(self, node_id):
-        # TODO:
-        pass
+        """
+        For each node_id, for each set of components to fuse, calculate K factor
+        :param node_id:
+        :return list of Ks:
+        """
+
+        node_comps = self.node_share[node_id]['node_comps']
+
+        Ks = []
+        for i in range(len(node_comps)):
+            fuse_comps = self.node_fuse_comps[node_id][i]
+            fuse_weights = self.node_fuse_weights[node_id][i]
+
+            if len(fuse_comps) == 1:
+                """
+                If nothing to fuse with component (no close enough 
+                components from neighbors to fuse) no need to calculate K 
+                """
+                Ks.append(1)
+            else:
+                """
+                Rescale weights to equal 1 if necessary
+                (only necessary if not all neighbors contributed)
+                """
+                sum_fuse_weights = float(sum(fuse_weights))
+                fuse_weights = [fw / sum_fuse_weights for fw in fuse_weights]
+                k = self.calcK(fuse_comps, fuse_weights)
+                Ks.append(k)
+
+        return Ks
 
     def fuse_covs_geom(self, node_id):
         """
@@ -660,7 +706,7 @@ class PHDFilterNetwork:
         neighboprs of node_id
 
         :param node_id:
-        :return new covariances:
+        :return new states:
         """
 
         node_comps = self.node_share[node_id]['node_comps']
@@ -704,7 +750,7 @@ class PHDFilterNetwork:
         neighboprs of node_id
 
         :param node_id:
-        :return new covariances:
+        :return new alphas:
         """
 
         node_comps = self.node_share[node_id]['node_comps']
