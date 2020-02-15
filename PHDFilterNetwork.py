@@ -31,7 +31,7 @@ class PHDFilterNetwork:
 
         """
         Dictionary of form {node_id : {neighbor_id: components}} which 
-        indicates which components of neihbor_id were shared with node_id 
+        indicates which components of neighbor_id were shared with node_id 
         """
         self.node_neighbor_comps = {}
 
@@ -43,14 +43,20 @@ class PHDFilterNetwork:
 
         """
         Dictionary of form {node_id : {comp_id: weights}} which indicates 
-        which weights to use when fusiing components in self.node_fuse_comps 
+        which weights to use when fusing components in self.node_fuse_comps 
         with comp_id of node_id 
         """
         self.node_fuse_weights = {}
 
+        """
+        Dictionary of form {node_id : cardinality_estimate} the estimate 
+        of total targets for node_id 
+        """
+        self.cardinality = {}
+
         self.merge_thresh = merge_thresh
 
-        self.cardinality = {}
+        # TODO: remove
         self.node_keep = {}
 
         # TRACKERS
@@ -67,7 +73,7 @@ class PHDFilterNetwork:
     """
     Simulation Operations
     """
-
+    # TODO: update
     def step_through(self, measurements, true_targets,
                      L=3, how='geom', opt='agent',
                      fail_int=None, fail_sequence=None,
@@ -289,24 +295,6 @@ class PHDFilterNetwork:
         center_y = sum(y) / float(len(x))
         return np.array([[center_x], [center_y]])
 
-    def cardinality_consensus(self):
-        nodes = nx.get_node_attributes(self.network, 'node')
-        weights = nx.get_node_attributes(self.network, 'weights')
-
-        for n1 in list(self.network.nodes()):
-            weighted_est = 0
-            tot_est = {}
-            for n2, weight in weights[n1].items():
-                est = np.nansum([t.weight for t in nodes[n2].targets])
-                weighted_est += est * weight
-                tot_est[n2] = est
-
-            # Rescale Weights using total weighted estimate
-            for t in nodes[n1].targets:
-                t.weight *= np.ceil(weighted_est) / tot_est[n1]
-
-            self.cardinality[n1] = int(np.ceil(weighted_est))
-
     def reduce_comps(self, node_id):
         node = nx.get_node_attributes(self.network, 'node')[node_id]
         node_comps = node.targets
@@ -315,296 +303,283 @@ class PHDFilterNetwork:
         keep_node_comps = node_comps[:limit]
         node.targets = keep_node_comps
 
-    def share_info(self, node_id):
-        G = self.network
+    """
+    Optimization Steps
+    """
+    
 
-        node = nx.get_node_attributes(G, 'node')[node_id]
-        self.node_share[node_id] = {}
-        self.node_share[node_id]['node_comps'] = node.targets
-        neighbor_comps = {}
-        for neighbor_id in list(G.neighbors(node_id)):
-            neighbor = nx.get_node_attributes(G, 'node')[neighbor_id]
-            neighbor_comps[neighbor_id] = neighbor.targets
+    """
+    Core Fusion Steps
+    1) Cardinality Consensus
+    2) Geometric or Arithmetic Fusion
+    3) Rescaling fused weights according to cardinality consensus
+    """
 
-        self.node_share[node_id]['neighbor_comps'] = neighbor_comps
+    def cardinality_consensus(self):
+        """
+        1) Each sensor gets local estimation of number of targets
+        2a) Each sensor shares local estimation with neighbors
+        2b) Each sensor updates their local estimation of number of targets
 
-    def get_closest_comps(self, node_id):
-        node_comps = self.node_share[node_id]['node_comps']
-        neighbor_comps = self.node_share[node_id]['neighbor_comps']
-        merge_thresh = nx.get_node_attributes(self.network, 'node')[node_id].merge_thresh
+        Note: the third step weight scaling occurs after the
+        geometric/arithmetic fusion
 
-        keep_comps = {}
-        for i in range(len(node_comps)):
-            keep_comps[i] = []
-            x_state = node_comps[i].state
-            x_cov = node_comps[i].state_cov
-            for neighbor, n_comps in neighbor_comps.items():
-                y_weight = nx.get_node_attributes(self.network,
-                                                  'weights')[node_id][neighbor]
-                d = merge_thresh
-                for neighbor_comp in n_comps:
-                    y_state = neighbor_comp.state
-                    # new_d = float(np.dot(np.dot((x_state - y_state).T,
-                    #                         np.linalg.inv(x_cov)),
-                    #                  x_state - y_state))
-                    new_d = math.hypot(y_state[0][0] - x_state[0][0],
-                                       y_state[1][0] - x_state[1][0])
-                    if new_d < d:
-                        current_closest = neighbor_comp
-                        keep_comps[i].append((y_weight, current_closest))
+        :return:
+        """
+        nodes = nx.get_node_attributes(self.network, 'node')
+        metro_weights = nx.get_node_attributes(self.network, 'weights')
 
-        self.node_keep[node_id] = keep_comps
-
-    def update_comps(self, how='geom'):
+        """
+        Get Local Estimation of number of targets
+        """
+        local_estimates = {}
         for n in list(self.network.nodes()):
-            node = nx.get_node_attributes(self.network, 'node')[n]
+            sum_weights = np.nansum([t.weight for t in nodes[n].targets])
+            local_estimates[n] = sum_weights
+
+        """
+        Share Local Estimation with neighbors
+        
+        shared_estimates is dict of form: {node_id: {neighbor_id: estimate}}
+        """
+        shared_estimates = {}
+
+        for node_id in list(self.network.nodes()):
+            neighbors = list(self.network.neighbors(node_id))
+            neighbor_estimates = {}
+            for neighbor_id in neighbors:
+                neighbor_estimates[neighbor_id] = local_estimates[neighbor_id]
+            shared_estimates[node_id] = neighbor_estimates
+
+        """
+        Updates local estimation of number of targets via fusion with 
+        neighbor estimates 
+        """
+        cardinality = {}
+        for node_id in list(self.network.nodes()):
+            weighted_estimate = 0
+
+            neighbor_weights = metro_weights[node_id]
+            for neighbor_id, estimate in shared_estimates[node_id].items():
+                neighbor_estimate = estimate
+                neighbor_weight = neighbor_weights[neighbor_id]
+                weighted_estimate += neighbor_weight * neighbor_estimate
+            cardinality[node_id] = weighted_estimate
+        self.cardinality = cardinality
+
+    def fuse_compoents(self, how='geom'):
+
+        """
+        Run utils to help with fusion
+        """
+        self.share_comps()
+        self.get_neighbors_comps()
+        self.get_comps_to_fuse()
+
+        for node_id in list(self.network.nodes()):
             if how == 'geom':
-                new_comps = self.fuse_comps_geom(n)
+                self.geometric_fusion(node_id)
             else:
-                new_comps = self.fuse_comps_arith(n)
-            new_comps.sort(key=attrgetter('weight'), reverse=True)
+                self.arithmetic_fusion(node_id)
 
-            if np.isnan([comp.state for comp in new_comps]).any():
-                print('nan state after fusing comps')
+    def rescale_component_weights(self):
+        nodes = nx.get_node_attributes(self.network, 'node')
 
-            tot_est = sum([comp.weight for comp in new_comps])
-            # Rescale Weights using cardinality
-            for t in new_comps:
-                t.weight *= self.cardinality[n] / tot_est
+        for node_id in list(self.network.nodes()):
+            old_estimate = np.nansum([t.weight
+                                      for t in nodes[node_id].targets])
+            new_estimate = self.cardinality[node_id]
+            rescaler = new_estimate / old_estimate
+            for t in nodes[node_id].targets:
+                t.weight = rescaler * t.weight
 
-            node.updated_targets = new_comps
-            node.prune()
-            node.merge()
-            node.targets = node.merged_targets
-
-    def fuse_comps_arith(self, node_id):
-        node_comps = self.node_share[node_id]['node_comps']
-
-        new_covs = self.fuse_covs(node_id, how='arith')
-        new_states, did_fuse = self.fuse_states(node_id, how='arith')
-        if np.isnan(new_states).any():
-            print('nan states after fusion')
-        new_alphas = self.fuse_alphas(node_id, new_covs, new_states, how='arith')
-        if np.isnan(new_alphas).any():
-            print('nan alphas after fusion')
-
-        fused_comps = []
-        for i in range(len(new_alphas)):
-            f = Target(init_weight=new_alphas[i],
-                       init_state=new_states[i],
-                       init_cov=new_covs[i],
-                       dt_1=node_comps[i].dt_1,
-                       dt_2=node_comps[i].dt_2)
-            fused_comps.append(f)
-        return fused_comps
-
-    # After fusing covs, states, and alphas the geometric way
-    def fuse_comps_geom(self, node_id):
-        node_comps = self.node_share[node_id]['node_comps']
-
-        new_covs = self.fuse_covs(node_id)
-        new_states, did_fuse = self.fuse_states(node_id)
-        new_alphas = self.fuse_alphas(node_id, new_covs, new_states)
-        for i in range(len(new_states)):
-            if did_fuse[i] == 1:
-                n = np.dot(new_covs[i], new_states[i])
-                new_states[i] = n
-
-        fused_comps = []
-        for i in range(len(new_alphas)):
-            f = Target(init_weight=new_alphas[i],
-                       init_state=new_states[i],
-                       init_cov=new_covs[i],
-                       dt_1=node_comps[i].dt_1,
-                       dt_2=node_comps[i].dt_2)
-            fused_comps.append(f)
-        return fused_comps
-
-    def fuse_covs(self, node_id, how='geom'):
-        # Use self.node_keep to fuse only the closest components among all neighbors
-        # If no close components skip fusion for this component
-
-        node_comps = self.node_share[node_id]['node_comps']
-        closest_neighbor_comps = self.node_keep[node_id]
-
-        weight = nx.get_node_attributes(self.network, 'weights')[node_id]
-
-        new_covs = []
-        for i in range(len(node_comps)):
-            if len(closest_neighbor_comps[i]) == 0:
-                new_covs.append(node_comps[i].state_cov)
-                continue
-
-            if how == 'geom':
-                comp_cov_inv = np.linalg.inv(node_comps[i].state_cov)
-                sum_covs = weight[node_id] * comp_cov_inv
-            else:
-                sum_covs = weight[node_id] * node_comps[i].state_cov
-
-            for c in closest_neighbor_comps[i]:
-                n_weight = c[0]
-                n_comp = c[1]
-                if how == 'geom':
-                    n_comp_cov_inv = np.linalg.inv(n_comp.state_cov)
-                    sum_covs += n_weight * n_comp_cov_inv
-                else:
-                    sum_covs += n_weight * n_comp.state_cov
-            if how == 'geom':
-                sum_covs = sum_covs + np.eye(sum_covs.shape[0]) * 10e-6
-                new_covs.append(np.linalg.inv(sum_covs))
-            else:
-                new_covs.append(sum_covs)
-
-        return new_covs
-
-    def fuse_states(self, node_id, how='geom'):
-        # Use self.node_keep to fuse only the closest components among all neighbors
-        # If no close components skip fusion for this component
-
-        node_comps = self.node_share[node_id]['node_comps']
-        closest_neighbor_comps = self.node_keep[node_id]
-
-        weight = nx.get_node_attributes(self.network, 'weights')[node_id]
-
-        new_states = []
-        did_fuse = []
-        for i in range(len(node_comps)):
-            if len(closest_neighbor_comps[i]) == 0:
-                new_states.append(node_comps[i].state)
-                did_fuse.append(0)
-                continue
-
-            did_fuse.append(1)
-            comp_state = node_comps[i].state
-            if how == 'geom':
-                comp_cov_inv = np.linalg.inv(node_comps[i].state_cov)
-                sum_states = weight[node_id] * np.dot(comp_cov_inv, comp_state)
-            else:
-                sum_states = weight[node_id] * comp_state
-            sum_weights = weight[node_id]
-
-            for c in closest_neighbor_comps[i]:
-                n_weight = c[0]
-                n_comp = c[1]
-                n_comp_state = n_comp.state
-                if how == 'geom':
-                    n_comp_cov_inv = np.linalg.inv(n_comp.state_cov)
-                    sum_states += n_weight * np.dot(n_comp_cov_inv, n_comp_state)
-                else:
-                    sum_states += n_weight * n_comp_state
-                sum_weights += n_weight
-
-            if sum_weights == 0:
-                new_states.append(node_comps[i].state)
-                did_fuse.append(0)
-            else:
-                if how == 'geom':
-                    new_states.append(sum_states)
-                else:
-                    new_states.append(sum_states / float(sum_weights))
-
-        return new_states, did_fuse
-
-    # Fuse the component weights
-    def fuse_alphas(self, node_id, new_covs, new_states, how='geom'):
-        # Use self.node_keep to fuse only the closest components among all neighbors
-        # If no close components skip fusion for this component
-
-        node_comps = self.node_share[node_id]['node_comps']
-        closest_neighbor_comps = self.node_keep[node_id]
-
-        weight = nx.get_node_attributes(self.network, 'weights')[node_id]
-
-        new_alphas = []
-        for i in range(len(node_comps)):
-            if len(closest_neighbor_comps[i]) == 0:
-                new_alphas.append(node_comps[i].weight)
-                continue
-
-            comp_alpha = node_comps[i].weight
-            if how == 'geom':
-                all_comps = [(weight[node_id], node_comps[i])] + \
-                            closest_neighbor_comps[i]
-                K = self.calcK(i, all_comps, new_covs, new_states)
-                comp_cov = node_comps[i].state_cov
-                rescaler = self.rescaler(comp_cov, weight[node_id])
-                # prod_alpha = comp_alpha ** weight * rescaler * K
-                prod_alpha = (comp_alpha ** weight[node_id]) * rescaler
-            else:
-                sum_alpha = comp_alpha
-
-            for c in closest_neighbor_comps[i]:
-                n_weight = c[0]
-                n_comp = c[1]
-                n_comp_alpha = n_comp.weight
-                if how == 'geom':
-                    n_comp_cov = n_comp.state_cov
-                    rescaler = self.rescaler(n_comp_cov, n_weight)
-                    prod_alpha *= (n_comp_alpha ** n_weight) * rescaler
-                else:
-                    sum_alpha += n_comp_alpha
-
-            if how == 'geom':
-                new_alphas.append(prod_alpha * K)
-            else:
-                new_alphas.append(sum_alpha)
-
-        return new_alphas
 
     """
     Fusion Utils (for both Geometric and Arithmetic fusion)
     """
 
-    def get_comps_to_fuse(self, node_id):
+    def share_comps(self):
         """
+        Prerequisite: after local PHD estimates
+
+        Creates dictionary of form {node_id : components} which indicates which
+        components belonging to node_id to share with neighbors
+
+        :param node_id:
+        :return:
+        """
+        node_share = {}
+
+        for node_id in list(self.network.nodes()):
+            node = nx.get_node_attributes(self.network, 'node')[node_id]
+            node_share[node_id] = node.targets
+
+        self.node_share = node_share
+
+    def get_neighbors_comps(self):
+        """
+        Prerequisite: after local PHD estimates
+
+        :return: None
+        Dictionary of form {node_id : {neighbor_id: components}} which
+        indicates which components of neihbor_id were shared with node_id
+        """
+        G = self.network
+
+        node_neighbor_comps = {}
+        for node_id in list(self.network.nodes()):
+            node_neighbor_comps[node_id] = {}
+
+            neighbors = list(G.neighbors(node_id))
+            for neighbor_id in neighbors:
+                neighbor_node = nx.get_node_attributes(G, 'node')[neighbor_id]
+                neighbor_comps = neighbor_node.targets
+                node_neighbor_comps[node_id][neighbor_id] = neighbor_comps
+
+        self.node_neighbor_comps = node_neighbor_comps
+
+    def get_comps_to_fuse(self):
+        """
+
+        Prerequisite: after sharing comps and getting neighbor comps
+
         Updates the dictionaries self.node_fuse_comps and
         self.node_fuse_weights to aid fusion
 
         :param node_id:
         :return None:
         """
+        G = self.network
+        for node_id in list(self.network.nodes()):
+            node_comps = self.node_share[node_id]
+            neighbor_comps = self.node_neighbor_comps[node_id]
+
+            metro_weights = nx.get_node_attributes(self.network,
+                                                   'weights')[node_id]
+
+            node_weight = metro_weights[node_id]
+
+            for i in range(len(node_comps)):
+                c0 = node_comps[i]
+
+                fuse_comps = [c0]
+                fuse_weights = [node_weight]
+                for neighbor_id, comps in neighbor_comps.items():
+                    """
+                    For each neighbor, find closest comp to node_comp[i]
+                    within merge_thresh (using mahalanobis distance)
+                    """
+                    closest_comp = None
+                    distances = [self.get_mahalanobis(c1, c0) for c1 in comps]
+                    closest_comp_index = comps.index(min(distances))
+
+                    if distances[closest_comp_index] <= self.merge_thresh:
+                        closest_comp = comps[closest_comp_index]
+
+                    if closest_comp is not None:
+                        fuse_comps.append(closest_comp)
+                        fuse_weights.append(metro_weights[neighbor_id])
+
+                self.node_fuse_comps[node_id][i] = fuse_comps
+                self.node_fuse_weights[node_id][i] = fuse_weights
+
+    """
+    Arithmetic Fusion
+    """
+    def arithmetic_fusion(self, node_id):
+        """
+        PRE-REQUISITE: that you ran self.get_comps_to_fuse
+
+        :param node_id:
+        :return list of new components for node_i:
+        """
 
         node_comps = self.node_share[node_id]['node_comps']
-        neighbor_comps = self.node_neighbor_comps[node_id]
 
-        network_weights = nx.get_node_attributes(self.network, 'weights')
+        covs = self.fuse_covs_arith(node_id)
+        states, alphas = self.fuse_states_alphas_arith(node_id)
 
-        node_weight = network_weights[node_id]
-
+        fuse_comps = []
         for i in range(len(node_comps)):
-            c0 = node_comps[i]
+            new_comp = Target(init_weight=alphas[i],
+                              init_state=states[i],
+                              init_cov=covs[i])
+            fuse_comps.append(new_comp)
+        return fuse_comps
 
-            fuse_comps = [c0]
-            fuse_weights = [node_weight]
-            for neighbor_id, comps in neighbor_comps.items():
+    def fuse_covs_arith(self, node_id):
+        node_comps = self.node_share[node_id]['node_comps']
+
+        new_covs = []
+        for i in range(len(node_comps)):
+            fuse_comps = self.node_fuse_comps[node_id][i]
+            fuse_weights = self.node_fuse_weights[node_id][i]
+
+            if len(fuse_comps) == 1:
                 """
-                For each neighbor, find closest comp to node_comp[i]
-                within merge_thresh (using mahalanobis distance)
+                If nothing to fuse with component (no close enough 
+                components from neighbors to fuse) keep current covariance 
                 """
-                closest_comp = None
-                distances = [self.get_mahalanobis(c1, c0) for c1 in comps]
-                closest_comp_index = comps.index(min(distances))
+                new_covs.append(node_comps[i].state_cov)
+            else:
+                """
+                Rescale weights to equal 1 if necessary
+                (only necessary if not all neighbors contributed)
+                """
+                sum_fuse_weights = float(sum(fuse_weights))
+                fuse_weights = [fw / sum_fuse_weights for fw in fuse_weights]
 
-                if distances[closest_comp_index] <= self.merge_thresh:
-                    closest_comp = comps[closest_comp_index]
+                """
+                Fuse According to Arith Fusion in paper
+                """
+                fuse_comps_weighted = []
+                for j in range(len(fuse_comps)):
+                    w = fuse_weights[j]
+                    cov = fuse_comps[j].state_cov
+                    fuse_comps_weighted.append(w * cov)
+                sum_covs = np.sum(fuse_comps_weighted, 0)
+                new_covs.append(sum_covs)
 
-                if closest_comp is not None:
-                    fuse_comps.append(closest_comp)
-                    fuse_weights.append(network_weights[neighbor_id])
+        return new_covs
 
-            self.node_fuse_comps[node_id][i] = fuse_comps
-            self.node_fuse_weights[node_id][i] = fuse_weights
+    def fuse_states_alphas_arith(self, node_id):
+        node_comps = self.node_share[node_id]['node_comps']
+
+        new_states = []
+        new_alphas = []
+        for i in range(len(node_comps)):
+            fuse_comps = self.node_fuse_comps[node_id][i]
+
+            if len(fuse_comps) == 1:
+                """
+                If nothing to fuse with component (no close enough 
+                components from neighbors to fuse) keep current state 
+                """
+                new_states.append(node_comps[i].state)
+            else:
+                """
+                Fuse According to Arith Fusion in paper
+                """
+                fuse_alpha_weighted_states = []
+                fuse_alphas = []
+
+                for j in range(len(fuse_comps)):
+                    alpha = fuse_comps[j].weight
+                    x = fuse_comps[j].state
+                    fuse_alpha_weighted_states.append(alpha * x)
+                    fuse_alphas.append(alpha)
+                sum_alpha_weighted_states = np.sum(fuse_alpha_weighted_states,
+                                                   0)
+                sum_alphas = np.sum(fuse_alphas)
+
+                new_states.append(sum_alpha_weighted_states / sum_alphas)
+                new_alphas.append(sum_alphas)
+
+        return new_states, new_alphas
+
 
     """
     Geometric Fusion
-    TODO:
-    order of ops
-    1) get sets of components to fuse (self.get_comps_to_fuse)
-    2) for each node
-    2a) get K for each set of components to be fused
-    2b) fuse covs
-    2c) fuse states
-    2d) fuse alphas
     """
 
     def geometric_fusion(self, node_id):
@@ -615,14 +590,20 @@ class PHDFilterNetwork:
         :return list of new components for node_i:
         """
 
+        node_comps = self.node_share[node_id]['node_comps']
+
         Ks = self.get_k(node_id)
+
         covs = self.fuse_covs_geom(node_id)
         states = self.fuse_states_geom(node_id, covs)
         alphas = self.fuse_alphas_geom(node_id, Ks)
 
         fuse_comps = []
-        # TODO: create the actual components
-
+        for i in range(len(node_comps)):
+            new_comp = Target(init_weight=alphas[i],
+                              init_state=states[i],
+                              init_cov=covs[i])
+            fuse_comps.append(new_comp)
         return fuse_comps
 
     def get_k(self, node_id):
@@ -993,7 +974,7 @@ class PHDFilterNetwork:
         return (numer / denom) ** 0.5
 
     @staticmethod
-    def get_mahalanobis(self, target1, target2):
+    def get_mahalanobis(target1, target2):
         d = mahalanobis(target1.state, target2.state,
                         np.linalg.inv(target1.state_cov))
         return d
