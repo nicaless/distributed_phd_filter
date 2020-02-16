@@ -56,9 +56,6 @@ class PHDFilterNetwork:
 
         self.merge_thresh = merge_thresh
 
-        # TODO: remove
-        self.node_keep = {}
-
         # TRACKERS
         self.failures = {}
         self.adjacencies = {}
@@ -73,16 +70,17 @@ class PHDFilterNetwork:
     """
     Simulation Operations
     """
-    # TODO: update
     def step_through(self, measurements, true_targets,
                      L=3, how='geom', opt='agent',
                      fail_int=None, fail_sequence=None,
                      base=False, noise_mult=1):
         nodes = nx.get_node_attributes(self.network, 'node')
+
         if not isinstance(measurements, dict):
             measurements = {0: measurements}
+            true_targets = {0: true_targets}
+
         failure = False
-        new_metro_weights = False
         for i, m in measurements.items():
             if fail_int is not None or fail_sequence is not None:
                 if fail_int is not None:
@@ -94,103 +92,45 @@ class PHDFilterNetwork:
                         failure = True
                         fail_node = self.apply_failure(i, fail=fail_sequence[i])
 
+            """
+            Local PHD Estimation
+            """
             for id, n in nodes.items():
                 n.step_through(m, i)
 
-            self.cardinality_consensus()
-
-            for id, n in nodes.items():
-                self.reduce_comps(id)
-
+            """
+            Core Fusion Steps
+            1) Cardinality Consensus
+            2) Geometric or Arithmetic Fusion
+            3) Rescaling fused weights according to cardinality consensus
+            """
             for l in range(L):
-                for id, n in nodes.items():
-                    self.share_info(id)
-                    self.get_closest_comps(id)
-                self.update_comps(how=how)
-                for id, n in nodes.items():
-                    self.reduce_comps(id)
+                self.cardinality_consensus()
+                self.fuse_components(how=how)
+                self.rescale_component_weights()
 
-            min_card = min([c for i, c in self.cardinality.items()])
-            min_targets = min([len(n.targets) for i, n in nodes.items()])
-            min_targets = min(min_targets, min_card)
-            covariance_matrix = self.get_covariance_matrix(min_targets,
-                                                           true_targets[i])
-            c_data, c_tr, c_inv_tr = self.get_covariance_trace(covariance_matrix,
-                                                               how=how)
+            """
+            Do Optimization and Formation Synthesis
+            """
             if failure and not base:
-                A = self.adjacency_matrix()
+                if opt == 'agent':
+                    self.do_agent_opt(fail_node, how=how)
+                elif opt == 'team':
+                    self.do_team_opt(how=how)
+                elif opt == 'greedy':
+                    self.do_greedy_opt(fail_node, how=how)
+
+                # Random strategy
+                else:
+                    self.do_random_opt(fail_node)
+
+                # Formation Synthesis
                 current_coords = {nid: n.position for nid, n in nodes.items()}
                 fov = {nid: n.fov for nid, n in nodes.items()}
+                centroid = self.get_centroid(fail_node)
 
-                weights = nx.get_node_attributes(self.network, 'weights')
-
-                if opt == 'agent':
-                    c_data_new = []
-                    for c in c_data:
-                        new_c = np.log(c)
-                        if np.isnan(new_c) or np.isinf(new_c):
-                            c_data_new.append(0)
-                        else:
-                            c_data_new.append(new_c)
-                    print(c_data_new)
-                    A, new_weights = agent_opt(A, weights, c_data_new,
-                                               failed_node=fail_node)
-                    # new_metro_weights = True
-                elif opt == 'greedy':
-                    # trace of cov of non-neighbors
-                    c_tr_copy = deepcopy(c_tr)
-                    non_neighbors = list(nx.non_neighbors(self.network, fail_node))
-                    c_tr_copy[fail_node] = np.inf
-
-                    c_tr_copy_fill = []
-                    for n, val in enumerate(c_tr_copy):
-                        if n in non_neighbors:
-                            c_tr_copy_fill.append(val)
-                        else:
-                            c_tr_copy_fill.append(np.inf)
-
-                    best_node = c_tr_copy.index(min(c_tr_copy))
-                    A[best_node, fail_node] = 1
-                    A[fail_node, best_node] = 1
-                    new_metro_weights = True
-                elif opt == 'random':
-                    non_neighbors = list(nx.non_neighbors(self.network, fail_node))
-                    if len(non_neighbors) != 0:
-                        rand_node = np.random.choice(non_neighbors)
-                        A[rand_node, fail_node] = 1
-                        A[fail_node, rand_node] = 1
-                        new_metro_weights = True
-                else:
-                    if how == 'geom':
-                        inv_cov_mat = []
-                        for c in covariance_matrix:
-                            inv_cov_mat.append(np.linalg.inv(c))
-                        A, new_weights = team_opt(A, weights, inv_cov_mat)
-                    else:
-                        A, new_weights = team_opt(A, weights, covariance_matrix)
-
-                    # A, new_weights = team_opt2(A, weights, covariance_matrix)
-
-                G = nx.from_numpy_matrix(A)
-                self.network = G
-                nx.set_node_attributes(self.network, nodes, 'node')
-                if new_metro_weights:
-                    new_weights = {}
-                    for id in range(len(list(nodes.keys()))):
-                        new_weights[id] = {}
-                        self_degree = G.degree(id)
-                        metropolis_weights = []
-                        for n in G.neighbors(id):
-                            degree = G.degree(n)
-                            mw = 1 / (1 + max(self_degree, degree))
-                            new_weights[id][n] = mw
-                            metropolis_weights.append(mw)
-                        new_weights[id][id] = 1 - sum(metropolis_weights)
-                    new_metro_weights = False
-                nx.set_node_attributes(self.network, new_weights, 'weights')
-
-                centroid = self.get_centroid()
-                new_coords = generate_coords(A, current_coords, fov, centroid)
+                new_coords = generate_coords(self.adjacency_matrix(),
+                                             current_coords, fov, centroid)
                 if new_coords:
                     for id, n in nodes.items():
                         n.update_position(new_coords[id])
@@ -199,8 +139,9 @@ class PHDFilterNetwork:
             for id, n in nodes.items():
                 n.update_trackers(i, pre_consensus=False)
 
-            self.max_trace_cov[i] = max(c_tr)
-            self.mean_trace_cov[i] = np.mean(c_tr)
+            trace_covs = self.get_trace_covariances()
+            self.max_trace_cov[i] = max(trace_covs)
+            self.mean_trace_cov[i] = np.mean(trace_covs)
             self.errors[i] = self.calc_errors(true_targets[i])
             self.gospa[i] = self.calc_ospa(true_targets[i])
             self.nmse_card[i] = self.calc_nmse_card(true_targets[i])
@@ -230,62 +171,13 @@ class PHDFilterNetwork:
         self.failures[i] = (fail_node, rpd)
         return fail_node
 
-    def get_covariance_trace(self, cov_matrix, how='geom'):
-        nodes = nx.get_node_attributes(self.network, 'node')
+    def get_centroid(self, fail_node):
+        node = nx.get_node_attributes(self.network, 'node')[fail_node]
 
-        covariance_matrix = cov_matrix
-
-        covariance_data = []
-        cov_tr = []
-        inv_cov_tr = []
-        for n, node in nodes.items():
-            cov = covariance_matrix[n]
-            tr_cov = np.trace(cov)
-            tr_inv_cov = np.trace(np.linalg.inv(cov +
-                                                np.eye(cov.shape[0]) * 10e-6))
-            cov_tr.append(tr_cov)
-            inv_cov_tr.append(tr_inv_cov)
-            if how == 'geom':
-                if tr_inv_cov == 0:
-                    tr_inv_cov = 0.01 * np.random.random(1)[0]
-                d = tr_inv_cov
-
-            else:
-                d = tr_cov
-            if self.cardinality[n] == 0:
-                d = 0
-            else:
-                d = d / float(self.cardinality[n])
-            covariance_data.append(d)
-
-        return covariance_data, cov_tr, inv_cov_tr
-
-    def get_covariance_matrix(self, min_targets, true_targets):
-        nodes = nx.get_node_attributes(self.network, 'node')
-
-        keep_targets = true_targets[:min_targets]
-
-        all_covs = []
-        for n, node in nodes.items():
-            cov = np.zeros((4 * len(keep_targets), 4 * len(keep_targets)))
-            all_covs.append(cov)
-
-        for i, t in enumerate(keep_targets):
-            for n, node in nodes.items():
-                distances = [math.hypot(t[0] - comp.state[0][0],
-                                        t[1] - comp.state[1][0])
-                             for comp in node.targets]
-                min_index = distances.index(min(distances))
-                all_covs[n][i:i+4, i:i+4] = node.targets[min_index].state_cov
-        return all_covs
-
-    def get_centroid(self):
-        nodes = nx.get_node_attributes(self.network, 'node')
         all_phd_states = []
-        for n, node in nodes.items():
-            for t in node.targets:
-                pos = np.array([[t.state[0][0]], [t.state[1][0]]])
-                all_phd_states.append(pos)
+        for t in node.targets:
+            pos = np.array([[t.state[0][0]], [t.state[1][0]]])
+            all_phd_states.append(pos)
 
         if len(all_phd_states) == 0:
             return np.array([[0], [0]])
@@ -295,6 +187,7 @@ class PHDFilterNetwork:
         center_y = sum(y) / float(len(x))
         return np.array([[center_x], [center_y]])
 
+    # TODO: remove, probably not needed anymore
     def reduce_comps(self, node_id):
         node = nx.get_node_attributes(self.network, 'node')[node_id]
         node_comps = node.targets
@@ -304,9 +197,120 @@ class PHDFilterNetwork:
         node.targets = keep_node_comps
 
     """
-    Optimization Steps
+    Optimization
     """
-    
+    def construct_blockdiag_cov(self, node_id, min_cardinality):
+        node = nx.get_node_attributes(self.network, 'node')[node_id]
+        node_comps = node.targets
+
+        if len(node_comps) == 1:
+            return node_comps[0]
+        else:
+            bd = scipy.linalg.block_diag(node_comps[0], node_comps[1])
+            for i in range(2, min_cardinality):
+                scipy.linalg.block_diag(node_comps[i].state_cov)
+            return bd
+
+    def prep_optimization_data(self, how='geom'):
+        # get min_cardinality
+        min_cardinality = min(self.cardinality.keys(),
+                              key=(lambda k: self.cardinality[k]))
+
+        # get the covariance data
+        cov_data = []
+        for node_id in list(self.network.nodes()):
+            P = self.construct_blockdiag_cov(node_id, min_cardinality)
+            if how == 'geom':
+                P = np.linalg.inv(P)
+            cov_data.append(P)
+
+        return min_cardinality, cov_data
+
+    def do_agent_opt(self, failed_node, how='geom'):
+        nodes = nx.get_node_attributes(self.network, 'node')
+
+        min_cardinality, cov_data = self.prep_optimization_data(how=how)
+
+        current_weights = nx.get_node_attributes(self.network, 'weights')
+
+        covariance_data = []
+        for c in cov_data:
+            det_c = np.linalg.det(c)
+            covariance_data.append((1/min_cardinality) * det_c)
+
+        new_config, new_weights = agent_opt(self.adjacency_matrix(),
+                                            current_weights,
+                                            covariance_data,
+                                            failed_node=failed_node)
+
+        G = nx.from_numpy_matrix(new_config)
+        self.network = G
+        nx.set_node_attributes(self.network, nodes, 'node')
+        nx.set_node_attributes(self.network, new_weights, 'weights')
+
+    def do_team_opt(self, how='geom'):
+        nodes = nx.get_node_attributes(self.network, 'node')
+
+        min_cardinality, cov_data = self.prep_optimization_data(how=how)
+
+        current_weights = nx.get_node_attributes(self.network, 'weights')
+
+        new_config, new_weights = team_opt(self.adjacency_matrix(),
+                                            current_weights,
+                                            cov_data)
+
+        G = nx.from_numpy_matrix(new_config)
+        self.network = G
+        nx.set_node_attributes(self.network, nodes, 'node')
+        nx.set_node_attributes(self.network, new_weights, 'weights')
+
+    def do_greedy_opt(self, failed_node, how='geom'):
+        nodes = nx.get_node_attributes(self.network, 'node')
+
+        min_cardinality, cov_data = self.prep_optimization_data(how=how)
+
+        current_neighbors = list(self.network.neighbors(failed_node))
+
+        best_cov_id = None
+        best_cov = np.inf
+        for neighbor_id in list(nodes):
+            if neighbor_id not in current_neighbors:
+                if np.linalg.det(cov_data[neighbor_id]) < best_cov:
+                    best_cov_id = neighbor_id
+
+        new_config = self.adjacency_matrix()
+        new_config[failed_node, best_cov_id] = 1
+        new_config[best_cov_id, failed_node] = 1
+
+        G = nx.from_numpy_matrix(new_config)
+        self.network = G
+        nx.set_node_attributes(self.network, nodes, 'node')
+
+        new_weights = self.get_metro_weights()
+        nx.set_node_attributes(self.network, new_weights, 'weights')
+
+    def do_random_opt(self, failed_node):
+        nodes = nx.get_node_attributes(self.network, 'node')
+        current_neighbors = list(self.network.neighbors(failed_node))
+
+        non_neighbors = []
+        for neighbor_id in list(nodes):
+            if neighbor_id not in current_neighbors:
+                non_neighbors.append(neighbor_id)
+
+        new_neighbor_id = np.random.choice(non_neighbors)
+
+        new_config = self.adjacency_matrix()
+        new_config[failed_node, new_neighbor_id] = 1
+        new_config[new_neighbor_id, failed_node] = 1
+
+        G = nx.from_numpy_matrix(new_config)
+        self.network = G
+        nx.set_node_attributes(self.network, nodes, 'node')
+
+        new_weights = self.get_metro_weights()
+        nx.set_node_attributes(self.network, new_weights, 'weights')
+
 
     """
     Core Fusion Steps
@@ -367,7 +371,7 @@ class PHDFilterNetwork:
             cardinality[node_id] = weighted_estimate
         self.cardinality = cardinality
 
-    def fuse_compoents(self, how='geom'):
+    def fuse_components(self, how='geom'):
 
         """
         Run utils to help with fusion
@@ -797,9 +801,39 @@ class PHDFilterNetwork:
 
         return A
 
+    def get_metro_weights(self):
+        G = self.network
+        num_nodes = len(list(self.network.nodes))
+        weight_attrs = {}
+
+        for i in range(num_nodes):
+            weight_attrs[i] = {}
+            self_degree = G.degree(i)
+            metropolis_weights = []
+            for n in G.neighbors(i):
+                degree = G.degree(n)
+                mw = 1 / (1 + max(self_degree, degree))
+                weight_attrs[i][n] = mw
+                metropolis_weights.append(mw)
+            weight_attrs[i][i] = 1 - sum(metropolis_weights)
+
+        return weight_attrs
+
+
     """
     Metric Calculations
     """
+
+    def get_trace_covariances(self):
+        min_cardinality = min(self.cardinality.keys(),
+                              key=(lambda k: self.cardinality[k]))
+
+        cov_data = []
+        for node_id in list(self.network.nodes()):
+            P = self.construct_blockdiag_cov(node_id, min_cardinality)
+            cov_data.append(np.linalg.tr(P))
+
+        return cov_data
 
     def calc_errors(self, true_targets):
         nodes = nx.get_node_attributes(self.network, 'node')

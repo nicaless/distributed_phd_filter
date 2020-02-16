@@ -27,8 +27,10 @@ class SimGenerator:
         self.last_timestep_targets = self.init_targets
         self.targets = {}
         self.true_positions = {}  # true positions
-        self.clutter_observations = {}  # for clutter particles
         self.observations = {}  # for true and clutter particles
+
+        # TODO: remove, not used in this module
+        self.clutter_observations = {}  # for clutter particles
 
     def iterate(self, k):
         next_timestep_targets = []
