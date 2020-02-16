@@ -11,16 +11,6 @@ from PHDFilterNode import PHDFilterNode
 from SimGenerator import SimGenerator
 from target import Target
 
-# import warnings
-#
-#
-# def fxn():
-#     warnings.warn("deprecated", RuntimeWarning)
-#
-#
-# with warnings.catch_warnings():
-#     warnings.simplefilter("ignore")
-#     fxn()
 
 np.random.seed(42)
 
@@ -35,13 +25,13 @@ args = parser.parse_args()
 num_nodes = args.num
 run_name = args.run_name
 
-fail_int = [10]
-x_start = -50 + (100.0 / (num_nodes + 1))
-pos_start = np.array([x_start, 0, 20])
-pos_init_dist = np.floor(100.0 / (num_nodes + 1))
+region = [(-50, 50), (-50, 50)]  # simulation space
+fail_int = [10]  # time steps at which failure occurs
+x_start = -50 + (100.0 / (num_nodes + 1))  # init x coord of first node
+pos_start = np.array([x_start, 0, 20])  # init x coord for all nodes
+pos_init_dist = np.floor(100.0 / (num_nodes + 1))  # init x dist between nodes
 fov = 20  # radius of FOV
-noise_mult = [1, 5, 10]
-
+noise_mult = [1]  # multiplier for added noise at each failure
 
 
 
@@ -56,22 +46,28 @@ if not os.path.exists(run_name):
 """
 Generate Data
 """
-generator = SimGenerator(5, init_targets=[Target()])
+generator = SimGenerator(init_targets=[Target()])
 generator.generate(20)
 generator.save_data(run_name)
 
 
-# TODO: birth model should only have weights in designated birth areas
 """
 Birth Models for entire space 
 """
-birthgmm = []
-for x in range(-50, 50, 2):
-    for y in range(-50, 50, 2):
-        target = Target(init_weight=1,
-                        init_state=np.array([[x], [y], [0.0], [0.0]]),
-                        dt_1=0, dt_2=0)
-        birthgmm.append(target)
+corner0 = Target(init_state=np.array([[region[0][0] + 10],
+                                      [region[1][0] + 10],
+                                      [0.1], [0.1]]))
+corner1 = Target(init_state=np.array([[region[0][0] + 10],
+                                      [region[1][1] - 10],
+                                      [0.1], [0.1]]), dt_2=-1)
+corner2 = Target(init_state=np.array([[region[0][1] - 10],
+                                      [region[1][1] - 10],
+                                      [0.1], [0.1]]), dt_1=-1, dt_2=-1)
+corner3 = Target(init_state=np.array([[region[0][1] - 10],
+                                      [region[1][0] + 10],
+                                      [0.1], [0.1]]), dt_1=-1)
+birthgmm = [corner0, corner1, corner2, corner3]
+
 
 """
 Create Nodes
@@ -109,10 +105,11 @@ for i in range(num_nodes):
 """
 For Loop for all Simulations
 """
+count_loops = 0
 saved_fail_sequence = None
 for noise in noise_mult:
     for how in ['arith', 'geom']:
-        for opt in ['base', 'agent', 'greedy', 'team']:
+        for opt in ['base', 'agent', 'greedy', 'team', 'random']:
             if opt == 'team':
                 mydir = 'misdp_data/inverse_covariance_matrices'
                 # Clear Out Old MISDP Data
@@ -179,3 +176,11 @@ for noise in noise_mult:
             filternetwork.save_estimates(trial_name)
             filternetwork.save_positions(trial_name)
             filternetwork.save_topologies(trial_name + '/topologies')
+            count_loops += 1
+
+
+expected_num_loops = len(noise_mult) * \
+                     len(['arith', 'geom']) * \
+                     len(['base', 'agent', 'greedy', 'team', 'random'])
+
+assert count_loops == expected_num_loops

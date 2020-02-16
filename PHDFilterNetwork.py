@@ -206,15 +206,18 @@ class PHDFilterNetwork:
         if len(node_comps) == 1:
             return node_comps[0]
         else:
-            bd = scipy.linalg.block_diag(node_comps[0], node_comps[1])
-            for i in range(2, min_cardinality):
+            bd = scipy.linalg.block_diag(node_comps[0].state_cov,
+                                         node_comps[1].state_cov)
+            for i in range(2, int(np.ceil(min_cardinality))):
                 scipy.linalg.block_diag(node_comps[i].state_cov)
             return bd
 
     def prep_optimization_data(self, how='geom'):
         # get min_cardinality
-        min_cardinality = min(self.cardinality.keys(),
-                              key=(lambda k: self.cardinality[k]))
+        min_cardinality_index = min(self.cardinality.keys(),
+                                    key=(lambda k: self.cardinality[k]))
+        min_cardinality = self.cardinality[min_cardinality_index]
+
 
         # get the covariance data
         cov_data = []
@@ -463,6 +466,8 @@ class PHDFilterNetwork:
 
             node_weight = metro_weights[node_id]
 
+            self.node_fuse_comps[node_id] = {}
+            self.node_fuse_weights[node_id] = {}
             for i in range(len(node_comps)):
                 c0 = node_comps[i]
 
@@ -475,7 +480,7 @@ class PHDFilterNetwork:
                     """
                     closest_comp = None
                     distances = [self.get_mahalanobis(c1, c0) for c1 in comps]
-                    closest_comp_index = comps.index(min(distances))
+                    closest_comp_index = np.argmin(distances)
 
                     if distances[closest_comp_index] <= self.merge_thresh:
                         closest_comp = comps[closest_comp_index]
@@ -498,7 +503,7 @@ class PHDFilterNetwork:
         :return list of new components for node_i:
         """
 
-        node_comps = self.node_share[node_id]['node_comps']
+        node_comps = self.node_share[node_id]
 
         covs = self.fuse_covs_arith(node_id)
         states, alphas = self.fuse_states_alphas_arith(node_id)
@@ -512,7 +517,7 @@ class PHDFilterNetwork:
         return fuse_comps
 
     def fuse_covs_arith(self, node_id):
-        node_comps = self.node_share[node_id]['node_comps']
+        node_comps = self.node_share[node_id]
 
         new_covs = []
         for i in range(len(node_comps)):
@@ -547,7 +552,7 @@ class PHDFilterNetwork:
         return new_covs
 
     def fuse_states_alphas_arith(self, node_id):
-        node_comps = self.node_share[node_id]['node_comps']
+        node_comps = self.node_share[node_id]
 
         new_states = []
         new_alphas = []
@@ -594,7 +599,7 @@ class PHDFilterNetwork:
         :return list of new components for node_i:
         """
 
-        node_comps = self.node_share[node_id]['node_comps']
+        node_comps = self.node_share[node_id]
 
         Ks = self.get_k(node_id)
 
@@ -617,7 +622,7 @@ class PHDFilterNetwork:
         :return list of Ks:
         """
 
-        node_comps = self.node_share[node_id]['node_comps']
+        node_comps = self.node_share[node_id]
 
         Ks = []
         for i in range(len(node_comps)):
@@ -651,7 +656,7 @@ class PHDFilterNetwork:
         :return new covariances:
         """
 
-        node_comps = self.node_share[node_id]['node_comps']
+        node_comps = self.node_share[node_id]
 
         new_covs = []
         for i in range(len(node_comps)):
@@ -694,7 +699,7 @@ class PHDFilterNetwork:
         :return new states:
         """
 
-        node_comps = self.node_share[node_id]['node_comps']
+        node_comps = self.node_share[node_id]
 
         new_states = []
         for i in range(len(node_comps)):
@@ -738,7 +743,7 @@ class PHDFilterNetwork:
         :return new alphas:
         """
 
-        node_comps = self.node_share[node_id]['node_comps']
+        node_comps = self.node_share[node_id]
 
         new_alphas = []
         for i in range(len(node_comps)):
@@ -825,13 +830,14 @@ class PHDFilterNetwork:
     """
 
     def get_trace_covariances(self):
-        min_cardinality = min(self.cardinality.keys(),
-                              key=(lambda k: self.cardinality[k]))
+        min_cardinality_index = min(self.cardinality.keys(),
+                                    key=(lambda k: self.cardinality[k]))
+        min_cardinality = self.cardinality[min_cardinality_index]
 
         cov_data = []
         for node_id in list(self.network.nodes()):
             P = self.construct_blockdiag_cov(node_id, min_cardinality)
-            cov_data.append(np.linalg.tr(P))
+            cov_data.append(np.trace(P))
 
         return cov_data
 
@@ -982,7 +988,7 @@ class PHDFilterNetwork:
         # Kappa n
         firstterm_n = d * np.log(2 * np.pi)
         secondterm_n = 0  # Fill in later
-        thirdterm_n = np.dot(q.T, np.linalg.inv(omega), q)
+        thirdterm_n = q.T * np.linalg.inv(omega) * q
 
         for i in range(len(comps)):
             weight = weights[i]
@@ -1012,27 +1018,3 @@ class PHDFilterNetwork:
         d = mahalanobis(target1.state, target2.state,
                         np.linalg.inv(target1.state_cov))
         return d
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

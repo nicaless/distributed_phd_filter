@@ -94,10 +94,14 @@ def team_opt(adj_mat, current_weights, covariance_matrices, ne=1):
         mat_command = '/Applications/MATLAB_R2019a.app/bin/matlab '
     matlab_string = mat_command + '-nodesktop -nosplash -r "MISDP_new_copy({e});exit;"'.format(
         e=ne)
+    print('Starting Up MATLAB')
     os.system(matlab_string)
-    if os.path.exists('misdp_data/fail.txt'):
-        os.system(matlab_string)
-        os.unlink('misdp_data/fail.txt')
+    print('Reading MATLAB results')
+
+    # if os.path.exists('misdp_data/fail.txt'):
+    #     os.system(matlab_string)
+    #     os.unlink('misdp_data/fail.txt')
+
     if os.path.exists('misdp_data/new_weights.csv'):
         new_weights = []
         with open('misdp_data/new_weights.csv', 'r') as f:
@@ -109,13 +113,16 @@ def team_opt(adj_mat, current_weights, covariance_matrices, ne=1):
     else:
         new_weights = current_weights
 
-    new_A = []
-    with open('misdp_data/new_A.csv', 'r') as f:
-        readCSV = csv.reader(f, delimiter=',')
-        for row in readCSV:
-            data = list(map(float, row))
-            new_A.append(data)
-    new_A = np.array(new_A)
+    if os.path.exists('misdp_data/new_A.csv'):
+        new_A = []
+        with open('misdp_data/new_A.csv', 'r') as f:
+            readCSV = csv.reader(f, delimiter=',')
+            for row in readCSV:
+                data = list(map(float, row))
+                new_A.append(data)
+        new_A = np.array(new_A)
+    else:
+        new_A = A
 
     if 'new_weights_mat' in locals():
         if np.array_equal(new_weights_mat, new_A):
