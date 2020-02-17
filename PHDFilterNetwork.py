@@ -246,9 +246,15 @@ class PHDFilterNetwork:
                                             covariance_data,
                                             failed_node=failed_node)
 
+        # G = nx.from_numpy_matrix(new_config)
+        # self.network = G
+        # nx.set_node_attributes(self.network, nodes, 'node')
+        # nx.set_node_attributes(self.network, new_weights, 'weights')
         G = nx.from_numpy_matrix(new_config)
         self.network = G
         nx.set_node_attributes(self.network, nodes, 'node')
+
+        new_weights = self.get_metro_weights()
         nx.set_node_attributes(self.network, new_weights, 'weights')
 
     def do_team_opt(self, how='geom'):
@@ -262,9 +268,15 @@ class PHDFilterNetwork:
                                             current_weights,
                                             cov_data)
 
+        # G = nx.from_numpy_matrix(new_config)
+        # self.network = G
+        # nx.set_node_attributes(self.network, nodes, 'node')
+        # nx.set_node_attributes(self.network, new_weights, 'weights')
         G = nx.from_numpy_matrix(new_config)
         self.network = G
         nx.set_node_attributes(self.network, nodes, 'node')
+
+        new_weights = self.get_metro_weights()
         nx.set_node_attributes(self.network, new_weights, 'weights')
 
     def do_greedy_opt(self, failed_node, how='geom'):
@@ -371,7 +383,8 @@ class PHDFilterNetwork:
                 neighbor_estimate = estimate
                 neighbor_weight = neighbor_weights[neighbor_id]
                 weighted_estimate += neighbor_weight * neighbor_estimate
-            cardinality[node_id] = weighted_estimate
+            # TODO: is ceil the right way to go?
+            cardinality[node_id] = np.ceil(weighted_estimate)
         self.cardinality = cardinality
 
     def fuse_components(self, how='geom'):
@@ -480,7 +493,7 @@ class PHDFilterNetwork:
                     """
                     closest_comp = None
                     distances = [self.get_mahalanobis(c1, c0) for c1 in comps]
-                    closest_comp_index = np.argmin(distances)
+                    closest_comp_index = int(np.argmin(distances))
 
                     if distances[closest_comp_index] <= self.merge_thresh:
                         closest_comp = comps[closest_comp_index]
@@ -565,6 +578,7 @@ class PHDFilterNetwork:
                 components from neighbors to fuse) keep current state 
                 """
                 new_states.append(node_comps[i].state)
+                new_alphas.append(node_comps[i].weight)
             else:
                 """
                 Fuse According to Arith Fusion in paper
@@ -642,6 +656,7 @@ class PHDFilterNetwork:
                 """
                 sum_fuse_weights = float(sum(fuse_weights))
                 fuse_weights = [fw / sum_fuse_weights for fw in fuse_weights]
+
                 k = self.calcK(fuse_comps, fuse_weights)
                 Ks.append(k)
 
@@ -974,9 +989,9 @@ class PHDFilterNetwork:
             inv_cov = np.linalg.inv(comps[j].state_cov)
             x = comps[j].state
             covs_weighted.append(w * inv_cov)
-            states_weighted.append(w * inv_cov * x)
+            states_weighted.append(w * np.dot(inv_cov, x))
         omega = np.sum(covs_weighted, 0)
-        q = np.sum(states_weighted)
+        q = np.sum(states_weighted, 0)
 
         d = comps[0].state.shape[0]
 
@@ -988,7 +1003,7 @@ class PHDFilterNetwork:
         # Kappa n
         firstterm_n = d * np.log(2 * np.pi)
         secondterm_n = 0  # Fill in later
-        thirdterm_n = q.T * np.linalg.inv(omega) * q
+        thirdterm_n = np.dot(q.T, np.dot(np.linalg.inv(omega), q))
 
         for i in range(len(comps)):
             weight = weights[i]
@@ -996,14 +1011,14 @@ class PHDFilterNetwork:
             cov = comps[i].state_cov
 
             secondterm_1n += np.log(np.linalg.det(weight * np.linalg.inv(cov)))
-            thirdterm_1n += weight * state.T * np.linalg.inv(cov) * state
+            thirdterm_1n += weight * np.dot(state.T, np.dot(np.linalg.inv(cov),
+                                                            state))
 
             secondterm_n += np.linalg.det(weight * np.linalg.inv(cov))
 
         kappa_1n = -0.5 * (firstterm_1n - secondterm_1n + thirdterm_1n)
         kappa_n = -0.5 * (firstterm_n - np.log(secondterm_n) + thirdterm_n)
 
-        # TODO: check
         K = np.exp(kappa_1n[0][0] - kappa_n[0][0])
         return K
 

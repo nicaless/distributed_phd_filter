@@ -107,7 +107,8 @@ For Loop for all Simulations
 """
 count_loops = 0
 saved_fail_sequence = None
-for noise in noise_mult:
+for n in range(len(noise_mult)):
+    noise = noise_mult[n]
     for how in ['arith', 'geom']:
         for opt in ['base', 'agent', 'greedy', 'team', 'random']:
             if opt == 'team':
@@ -123,9 +124,7 @@ for noise in noise_mult:
                 if os.path.exists('misdp_data/new_weights.csv'):
                     os.remove('misdp_data/new_weights.csv')
 
-            trial_name = run_name + '/{noise}_{h}_{o}'.format(noise=noise,
-                                                              h=how,
-                                                              o=opt)
+            trial_name = run_name + '/{n}_{h}_{o}'.format(n=n, h=how, o=opt)
             print(trial_name)
 
             filternetwork = PHDFilterNetwork(deepcopy(node_attrs),

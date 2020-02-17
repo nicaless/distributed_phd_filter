@@ -1,9 +1,14 @@
 import csv
+import math
 import numpy as np
 import os
 import cvxopt as cvx
 import picos as pic
 import platform
+
+
+def magnitude(x):
+    return int(math.log10(x))
 
 
 def agent_opt(adj_mat, current_weights, covariance_data, ne=1, failed_node=None):
@@ -23,6 +28,11 @@ def agent_opt(adj_mat, current_weights, covariance_data, ne=1, failed_node=None)
     node_bin = np.zeros((1, n))
     if failed_node is not None:
         node_bin[0][failed_node] = 1
+
+    # Reducing Magnitude if necessary
+    magnitude_covs = [magnitude(cov) for cov in covariance_data]
+    if max(magnitude_covs) > 17:
+        covariance_data = [cov * 1e-17 for cov in covariance_data]
 
     # Init Problem
     problem = pic.Problem()

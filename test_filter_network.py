@@ -76,20 +76,26 @@ class FilterNodeTests(TestCase):
     def tearDown(self):
         super().tearDown()
 
-    def test_get_k(self):
-        pass
+    # def test_get_k(self):
+    #     pass
+    #
+    # def test_fuse_covs_geom(self):
+    #     pass
+    #
+    # def test_fuse_states_geom(self):
+    #     pass
+    #
+    # def test_fuse_alphas_geom(self):
+    #     pass
 
-    def test_fuse_covs_geom(self):
-        pass
-
-    def test_fuse_states_geom(self):
-        pass
-
-    def test_fuse_alphas_geom(self):
-        pass
-
-    def test_fuse_geom_geom(self):
-        pass
+    def test_fuse_geom(self):
+        self.filternetwork.step_through(self.generator.observations[0],
+                                        self.generator.true_positions[0],
+                                        how='geom',
+                                        opt='team',
+                                        fail_int=[1],
+                                        base=True,
+                                        noise_mult=1)
 
 
 
