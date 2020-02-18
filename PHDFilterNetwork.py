@@ -99,17 +99,6 @@ class PHDFilterNetwork:
                 n.step_through(m, i)
 
             """
-            Core Fusion Steps
-            1) Cardinality Consensus
-            2) Geometric or Arithmetic Fusion
-            3) Rescaling fused weights according to cardinality consensus
-            """
-            for l in range(L):
-                self.cardinality_consensus()
-                self.fuse_components(how=how)
-                self.rescale_component_weights()
-
-            """
             Do Optimization and Formation Synthesis
             """
             if failure and not base:
@@ -135,6 +124,17 @@ class PHDFilterNetwork:
                     for id, n in nodes.items():
                         n.update_position(new_coords[id])
                 failure = False
+
+            """
+            Core Fusion Steps
+            1) Cardinality Consensus
+            2) Geometric or Arithmetic Fusion
+            3) Rescaling fused weights according to cardinality consensus
+            """
+            for l in range(L):
+                self.cardinality_consensus()
+                self.fuse_components(how=how)
+                self.rescale_component_weights()
 
             for id, n in nodes.items():
                 n.update_trackers(i, pre_consensus=False)
@@ -209,7 +209,7 @@ class PHDFilterNetwork:
             bd = scipy.linalg.block_diag(node_comps[0].state_cov,
                                          node_comps[1].state_cov)
             for i in range(2, int(np.ceil(min_cardinality))):
-                scipy.linalg.block_diag(node_comps[i].state_cov)
+                bd = scipy.linalg.block_diag(bd, node_comps[i].state_cov)
             return bd
 
     def prep_optimization_data(self, how='geom'):

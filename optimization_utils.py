@@ -1,10 +1,11 @@
 import csv
+import cvxopt as cvx
 import math
 import numpy as np
 import os
-import cvxopt as cvx
 import picos as pic
 import platform
+from scipy.linalg import block_diag
 
 
 def magnitude(x):
@@ -52,15 +53,15 @@ def agent_opt(adj_mat, current_weights, covariance_data, ne=1, failed_node=None)
     problem.add_constraint(mu >= 0.001)
     problem.add_constraint(mu < 1)
     problem.add_constraint(
-        (A * np.ones((n, 1))) == np.ones((n, 1)))  # Constraint 2
+        (A * np.ones((n, 1))) == np.ones((n, 1)))  # Constraint 1
     problem.add_constraint((beta * np.dot(np.ones(n).T, np.ones(n))) +
-                           (1 - mu) * np.eye(n) >= A)  # Constraint 3
+                           (1 - mu) * np.eye(n) >= A)  # Constraint 2
 
     for i in range(n):
         problem.add_constraint(A[i, i] > 0)  # Constraint 6
         for j in range(n):
             if i == j:
-                problem.add_constraint(PI[i, j] == 1.0)  # Constraint 4
+                problem.add_constraint(PI[i, j] == 1.0)  # Constraint 3
             else:
                 problem.add_constraint(A[i, j] > 0)  # Constraint 7
                 problem.add_constraint(A[i, j] <= PI[i, j])  # Constraint 8
@@ -151,117 +152,129 @@ def team_opt(adj_mat, current_weights, covariance_matrices, ne=1):
 
 
 def team_opt2(adj_mat, current_weights, covariance_matrices, ne=1):
-    edge_mod_limit = ne
+    """
+   Runs the team optimization problem
+
+   :param adj_mat: the Adjacency matrix
+   :param current_weights: current node weights
+   :param covariance_data: list of each node's large covariance matrix
+   :param ne: limit for number of edges to change
+   :param failed_node: the node that fails
+   :return: new adjacency matrix and new weights
+   """
+    edge_mod_limit = ne * 2
     n = adj_mat.shape[0]
     beta = 1 / n
-    cov_shape = covariance_matrices[0].shape
-    s = cov_shape[0]
-    inv_covs = []
-    for cov in covariance_matrices:
-        inv_covs.append(cvx.matrix(np.linalg.inv(cov)))
+
+    # Reducing Magnitude if necessary
+    mag_max_val_in_matrices = magnitude(max([np.max(cov)
+                                         for cov in covariance_matrices]))
+    if mag_max_val_in_matrices > 17:
+        covariance_data = [cov * 1e-17 for cov in covariance_matrices]
 
     # Init Problem
     problem = pic.Problem()
 
     # Add Variables
-    A = problem.add_variable('A', adj_mat.shape, 'symmetric')  # A is an SDP var
-    PI = problem.add_variable('PI', adj_mat.shape, 'binary')  # PI is a binary var
+    A = problem.add_variable('A', adj_mat.shape,
+                             'symmetric')  # A is an SDP var
+    PI = problem.add_variable('PI', adj_mat.shape,
+                              'binary')  # PI is a binary var
     mu = problem.add_variable('mu', 1)  # mu is an SDP var
-    P = []
+
+    Pbar = problem.add_variable('Pbar', (n * covariance_matrices[0].shape[0],
+                                         n * covariance_matrices[0].shape[1]),
+                                'complex')
+
+    delta_bar_list = []
     for i in range(n):
-        P.append(problem.add_variable('P[{0}]'.format(i), cov_shape))
-    Pbar = problem.add_variable('Pbar', (cov_shape[0] * n, cov_shape[1] * n))
+        delta_bar_list.append(
+            problem.add_variable('delta[{0}]'.format(i),
+                                 covariance_matrices[0].shape,
+                                 'complex'))
+    print(delta_bar_list)
 
-    delta = []
-    for i in range(n):
-        delta.append(problem.add_variable('delta[{0}]'.format(i), cov_shape))
-    delta_bar = problem.add_variable('delta_bar', (cov_shape[0] * n, cov_shape[1] * n))
-    delta_array = problem.add_variable('delta_array', (cov_shape[0] * n, cov_shape[1]))
+    # TODO: check if this is going to work
+    delta_bar = problem.add_variable('delta_bar',
+                                     (n * covariance_matrices[0].shape[0],
+                                      n * covariance_matrices[0].shape[1]),
+                                     'complex')
+    """
+    Setting Additional Constraint such that delta_bar elements equal 
+    elements in delta_bar_list 
+    """
 
-    # Set Objective
-    # problem.set_objective('min', beta * pic.sum([pic.trace(P[i]) for i in range(n)]))
-    problem.set_objective('min', pic.trace(Pbar))
-
-    # Set Constraints
-    # Constraint so that Ps are in Pbar
-    for i in range(n):
-        start = i * s
-        end = i * s + s
-        problem.add_constraint(Pbar[start:end, start:end] == P[i])
-        # if i < (n - 1):
-        #     # Fill everything to left with 0s
-        #     problem.add_constraint(Pbar[start:end, end:] == 0)
-        #     # Fill everything below with 0s
-        #     problem.add_constraint(Pbar[end:, start:end] == 0)
-
-    # Constraint so that deltas are in delta_bar
-    for i in range(n):
-        start = i * s
-        end = i * s + s
-        problem.add_constraint(delta_bar[start:end, start:end] == delta[i])
-        # if i < (n - 1):
-        #     # Fill everything to left with 0s
-        #     problem.add_constraint(delta_bar[start:end, end:] == 0)
-        #     # Fill everything below with 0s
-        #     problem.add_constraint(delta_bar[end:, start:end] == 0)
-    # Constraint so that deltas are in delta_array
-    for i in range(n):
-        start = i * s
-        end = i * s + s
-        problem.add_constraint(delta_array[start:end, :] == delta[i])
-
-    # Schur constraint
-    p_size = Pbar.size[0]
-    schur = problem.add_variable('schur', (p_size * 2, p_size * 2))
-    problem.add_constraint(schur[0:p_size, 0:p_size] == delta_bar)
-    problem.add_constraint(schur[p_size:, p_size:] == Pbar)
-    problem.add_constraint(schur[0:p_size, p_size:] == np.eye(p_size))
-    problem.add_constraint(schur[p_size:, 0:p_size] == np.eye(p_size))
-    problem.add_constraint(schur >= 0)
-
-    # Kron constraints
-    I = pic.new_param('I', np.eye(s))
-    problem.add_constraint(pic.kron(A, I) * cvx.matrix(inv_covs) == delta_array)
-    # print(cvx.matrix(inv_covs))
-    # print(cvx.matrix(dot(kron(adj_mat, eye(s)), cvx.matrix(inv_covs))))
-
-    problem.add_constraint(mu >= 0.00001)
-    problem.add_constraint(mu < 1)
-    problem.add_constraint((A * np.ones((n, 1))) == np.ones((n, 1)))  # Constraint 2
-    problem.add_constraint((beta * np.dot(np.ones(n).T, np.ones(n))) +
-                           (1 - mu) * np.eye(n) >= A)  # Constraint 3
-
-    for i in range(n):
-        problem.add_constraint(A[i, i] > 0)  # Constraint 6
-        for j in range(n):
-            if i == j:
-                problem.add_constraint(PI[i, j] == 1.0)  # Constraint 4
-            else:
-                problem.add_constraint(A[i, j] >= 0)  # Constraint 7
-                problem.add_constraint(A[i, j] <= PI[i, j])  # Constraint 8
-
-    problem.add_constraint(abs(PI - adj_mat) ** 2 <= edge_mod_limit)  # Constraint 9
-
-    problem.solve(verbose=0, solver='mosek')
-    problem_status = problem.status
-    print('status: {s}'.format(s=problem_status))
-    if problem_status != 'integer optimal':
-        print(PI)
-        return adj_mat, current_weights
-
-    new_config = np.zeros(adj_mat.shape)
-    new_weights = {}
-    for i in range(n):
-        new_weights[i] = {}
-
-    for i in range(n):
-        new_weights[i][i] = A[i, i].value
-        new_config[i, i] = 1
-        for j in range(i + 1, n):
-            new_config[i, j] = round(PI[i, j].value)
-            new_config[j, i] = round(PI[j, i].value)
-            new_weights[i][j] = A[i, j].value
-            new_weights[j][i] = A[j, i].value
-    return new_config, new_weights
+    # delta_bar = []
+    # for i in range(n):
+    #     for j in range(n):
+    #         if i == j:
+    #             delta_bar.append(delta_bar_list[i])
+    #         else:
+    #             delta_bar.append(np.zeros(covariance_matrices[0].shape))
+    # print(delta_bar)
 
 
+    # # Set Objective
+    # problem.set_objective('min',
+    #                       -1 * node_bin * A * np.array(covariance_data).T)
+    #
+    # # Set Constraints
+    # problem.add_constraint(mu >= 0.001)
+    # problem.add_constraint(mu < 1)
+    # problem.add_constraint(
+    #     (A * np.ones((n, 1))) == np.ones((n, 1)))  # Constraint 1
+    # problem.add_constraint((beta * np.dot(np.ones(n).T, np.ones(n))) +
+    #                        (1 - mu) * np.eye(n) >= A)  # Constraint 2
+    #
+    # for i in range(n):
+    #     problem.add_constraint(A[i, i] > 0)  # Constraint 6
+    #     for j in range(n):
+    #         if i == j:
+    #             problem.add_constraint(PI[i, j] == 1.0)  # Constraint 3
+    #         else:
+    #             problem.add_constraint(A[i, j] > 0)  # Constraint 7
+    #             problem.add_constraint(A[i, j] <= PI[i, j])  # Constraint 8
+    #
+    # problem.add_constraint(
+    #     abs(PI - adj_mat) ** 2 <= edge_mod_limit)  # Constraint 9
+    #
+    # problem.solve(verbose=0, solver='mosek')
+    # problem_status = problem.status
+    # print('status: {s}'.format(s=problem_status))
+    # if problem_status != 'integer optimal':
+    #     return adj_mat, current_weights
+    #
+    # new_config = np.zeros(adj_mat.shape)
+    # new_weights = {}
+    # for i in range(n):
+    #     new_weights[i] = {}
+    #
+    # for i in range(n):
+    #     new_weights[i][i] = A[i, i].value
+    #     new_config[i, i] = 1
+    #     for j in range(i + 1, n):
+    #         new_config[i, j] = round(PI[i, j].value)
+    #         new_config[j, i] = round(PI[j, i].value)
+    #         new_weights[i][j] = A[i, j].value
+    #         new_weights[j][i] = A[j, i].value
+    # return new_config, new_weights
+
+
+# adj_mat = np.array([[1, 1, 0],
+#                     [1, 1, 1],
+#                     [0, 1, 1]])
+#
+# current_weights = {0: {0: .67, 1: .33, 2: 0.},
+#                    1: {0: .33, 1: .33, 2: 0.33},
+#                    2: {0: 0., 1: .33, 2: 0.67}}
+#
+# c0 = np.diag((0.01, 0.01, 0.01, 0.01))
+# c1 = np.diag((0.01, 0.01, 0.01, 0.01))
+# c2 = np.diag((0.01, 0.01, 0.01, 0.01))
+# covariance_matrices = [c0, c1, c2]
+#
+# print(adj_mat)
+# print(current_weights)
+# print(covariance_matrices)
+#
+# team_opt2(adj_mat, current_weights, covariance_matrices)
