@@ -25,14 +25,13 @@ args = parser.parse_args()
 num_nodes = args.num
 run_name = args.run_name
 
-total_time_steps = 50
 region = [(-50, 50), (-50, 50)]  # simulation space
-fail_int = [5, 10, 15, 20, 25, 30, 35, 40, 45]  # time steps at which failure occurs
+fail_int = [10]  # time steps at which failure occurs
 x_start = -50 + (100.0 / (num_nodes + 1))  # init x coord of first node
 pos_start = np.array([x_start, 0, 20])  # init x coord for all nodes
 pos_init_dist = np.floor(100.0 / (num_nodes + 1))  # init x dist between nodes
 fov = 20  # radius of FOV
-noise_mult = [1, 1, 1, 1, 1]  # multiplier for added noise at each failure
+noise_mult = [1]  # multiplier for added noise at each failure
 
 
 
@@ -48,7 +47,7 @@ if not os.path.exists(run_name):
 Generate Data
 """
 generator = SimGenerator(init_targets=[Target()])
-generator.generate(total_time_steps)
+generator.generate(20)
 generator.save_data(run_name)
 
 

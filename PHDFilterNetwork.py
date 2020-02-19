@@ -264,9 +264,13 @@ class PHDFilterNetwork:
 
         current_weights = nx.get_node_attributes(self.network, 'weights')
 
-        new_config, new_weights = team_opt(self.adjacency_matrix(),
+        # new_config, new_weights = team_opt(self.adjacency_matrix(),
+        #                                     current_weights,
+        #                                     cov_data)
+        new_config, new_weights = team_opt2(self.adjacency_matrix(),
                                             current_weights,
-                                            cov_data)
+                                            cov_data,
+                                            how=how)
 
         # G = nx.from_numpy_matrix(new_config)
         # self.network = G

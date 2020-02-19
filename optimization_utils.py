@@ -33,6 +33,7 @@ def agent_opt(adj_mat, current_weights, covariance_data, ne=1, failed_node=None)
     # Reducing Magnitude if necessary
     magnitude_covs = [magnitude(cov) for cov in covariance_data]
     if max(magnitude_covs) > 17:
+        print('rescaling matrix magnitude, magnitude too high')
         covariance_data = [cov * 1e-17 for cov in covariance_data]
 
     # Init Problem
@@ -88,6 +89,7 @@ def agent_opt(adj_mat, current_weights, covariance_data, ne=1, failed_node=None)
             new_config[j, i] = round(PI[j, i].value)
             new_weights[i][j] = A[i, j].value
             new_weights[j][i] = A[j, i].value
+    print(new_config)
     return new_config, new_weights
 
 
@@ -151,7 +153,7 @@ def team_opt(adj_mat, current_weights, covariance_matrices, ne=1):
     return new_A, new_weights
 
 
-def team_opt2(adj_mat, current_weights, covariance_matrices, ne=1):
+def team_opt2(adj_mat, current_weights, covariance_matrices, how='geom', ne=1):
     """
    Runs the team optimization problem
 
@@ -166,12 +168,14 @@ def team_opt2(adj_mat, current_weights, covariance_matrices, ne=1):
     n = adj_mat.shape[0]
     beta = 1 / n
     s = covariance_matrices[0].shape[0]
-    tol = 0.00001
+    # tol = 0.00001
+    tol = 0.0001
     p_size = n * s
 
     # Reducing Magnitude if necessary
     mag_max_val_in_matrices = magnitude(max([np.max(cov) for cov in covariance_matrices]))
     if mag_max_val_in_matrices > 17:
+        print('rescaling matrix magnitude, magnitude too high')
         covariance_matrices = [cov * 1e-17 for cov in covariance_matrices]
 
     cov_array = np.zeros((n * s, s))
@@ -179,6 +183,7 @@ def team_opt2(adj_mat, current_weights, covariance_matrices, ne=1):
         start = i * s
         end = i * s + s
         cov_array[start:end, 0:s] = covariance_matrices[i]
+        print(covariance_matrices[i])
 
     # Init Problem
     problem = pic.Problem()
@@ -198,15 +203,18 @@ def team_opt2(adj_mat, current_weights, covariance_matrices, ne=1):
 
     delta_bar = problem.add_variable('delta_bar', (p_size, p_size))
     delta_array = problem.add_variable('delta_array', (p_size, s))
-    schur = problem.add_variable('schur', (p_size * 2, p_size * 2))
+    if how == 'geom':
+        schur = problem.add_variable('schur', (p_size * 2, p_size * 2))
 
     # Add Params (ie constant affine expressions to help with creating constraints)
     I = pic.new_param('I', np.eye(s))
     cov_array_param = pic.new_param('covs', cov_array)
-    print(cov_array_param)
 
     # Set Objective
-    problem.set_objective('min', pic.trace(Pbar))
+    if how == 'geom':
+        problem.set_objective('min', pic.trace(Pbar))
+    else:
+        problem.set_objective('min', pic.trace(delta_bar))
 
     # Constraints
 
@@ -227,18 +235,18 @@ def team_opt2(adj_mat, current_weights, covariance_matrices, ne=1):
     for i in range(n):
         start = i * s
         end = i * s + s
-        print(delta_array[start:end, :].size)
         problem.add_constraint(abs(delta_array[start:end, :] - delta_list[i]) <= tol)
 
     # TODO: This may not work
-    # Setting Additional Constraint such that delta_bar and Pbar elements in schur variable (with some tolerance)
-    problem.add_constraint(abs(schur[0:p_size, 0:p_size] - Pbar) <= tol)
-    problem.add_constraint(abs(schur[p_size:, p_size:] - delta_bar) <= tol)
-    problem.add_constraint(schur[0:p_size, p_size:] == np.eye(p_size))
-    problem.add_constraint(schur[p_size:, 0:p_size] == np.eye(p_size))
+    if how == 'geom':
+        # Setting Additional Constraint such that delta_bar and Pbar elements in schur variable (with some tolerance)
+        problem.add_constraint(abs(schur[0:p_size, 0:p_size] - Pbar) <= tol)
+        problem.add_constraint(abs(schur[p_size:, p_size:] - delta_bar) <= tol)
+        problem.add_constraint(schur[0:p_size, p_size:] == np.eye(p_size))
+        problem.add_constraint(schur[p_size:, 0:p_size] == np.eye(p_size))
 
-    # Schur constraint
-    problem.add_constraint(schur >= 0)
+        # Schur constraint
+        problem.add_constraint(schur >= 0)
 
     # Kron constraint
     problem.add_constraint(pic.kron(A, I) * cov_array_param == delta_array)
@@ -286,21 +294,21 @@ def team_opt2(adj_mat, current_weights, covariance_matrices, ne=1):
     return new_config, new_weights
 
 
-adj_mat = np.array([[1, 1, 0],
-                    [1, 1, 1],
-                    [0, 1, 1]])
-
-current_weights = {0: {0: .67, 1: .33, 2: 0.},
-                   1: {0: .33, 1: .33, 2: 0.33},
-                   2: {0: 0., 1: .33, 2: 0.67}}
-
-c0 = np.diag((0.01, 0.01, 0.01, 0.01))
-c1 = np.diag((0.01, 0.01, 0.01, 0.01))
-c2 = np.diag((0.01, 0.01, 0.01, 0.01))
-covariance_matrices = [c0, c1, c2]
-
-print(adj_mat)
-print(current_weights)
-print(covariance_matrices)
-
-team_opt2(adj_mat, current_weights, covariance_matrices)
+# adj_mat = np.array([[1, 1, 0],
+#                     [1, 1, 1],
+#                     [0, 1, 1]])
+#
+# current_weights = {0: {0: .67, 1: .33, 2: 0.},
+#                    1: {0: .33, 1: .33, 2: 0.33},
+#                    2: {0: 0., 1: .33, 2: 0.67}}
+#
+# c0 = np.diag((0.01, 0.01, 0.01, 0.01))
+# c1 = np.diag((0.01, 0.01, 0.01, 0.01))
+# c2 = np.diag((0.05, 0.05, 0.05, 0.05))
+# covariance_matrices = [c0, c1, c2]
+#
+# print(adj_mat)
+# print(current_weights)
+# print(covariance_matrices)
+#
+# team_opt2(adj_mat, current_weights, covariance_matrices, how='arith')
