@@ -34,7 +34,8 @@ def agent_opt(adj_mat, current_weights, covariance_data, ne=1, failed_node=None)
     magnitude_covs = [magnitude(cov) for cov in covariance_data]
     if max(magnitude_covs) > 17:
         print('rescaling matrix magnitude, magnitude too high')
-        covariance_data = [cov * 1e-17 for cov in covariance_data]
+        covariance_data = [cov * 10 ** max(magnitude_covs)
+                           for cov in covariance_data]
 
     # Init Problem
     problem = pic.Problem()
@@ -173,17 +174,18 @@ def team_opt2(adj_mat, current_weights, covariance_matrices, how='geom', ne=1):
     p_size = n * s
 
     # Reducing Magnitude if necessary
-    mag_max_val_in_matrices = magnitude(max([np.max(cov) for cov in covariance_matrices]))
+    mag_max_val_in_matrices = magnitude(max([np.max(cov)
+                                             for cov in covariance_matrices]))
     if mag_max_val_in_matrices > 17:
         print('rescaling matrix magnitude, magnitude too high')
-        covariance_matrices = [cov * 1e-17 for cov in covariance_matrices]
+        covariance_matrices = [cov * 10 ** mag_max_val_in_matrices
+                               for cov in covariance_matrices]
 
     cov_array = np.zeros((n * s, s))
     for i in range(n):
         start = i * s
         end = i * s + s
         cov_array[start:end, 0:s] = covariance_matrices[i]
-        print(covariance_matrices[i])
 
     # Init Problem
     problem = pic.Problem()
