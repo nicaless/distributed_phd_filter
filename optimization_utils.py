@@ -57,7 +57,7 @@ def agent_opt(adj_mat, current_weights, covariance_data, ne=1, failed_node=None)
     problem.add_constraint(
         (A * np.ones((n, 1))) == np.ones((n, 1)))  # Constraint 1
     problem.add_constraint((beta * np.dot(np.ones(n).T, np.ones(n))) +
-                           (1 - mu) * np.eye(n) >> A)  # Constraint 2
+                           (1 - mu) * np.eye(n) >= A)  # Constraint 2
 
     for i in range(n):
         problem.add_constraint(A[i, i] > 0)  # Constraint 6
@@ -248,7 +248,7 @@ def team_opt2(adj_mat, current_weights, covariance_matrices, how='geom', ne=1):
         problem.add_constraint(schur[p_size:, 0:p_size] == np.eye(p_size))
 
         # Schur constraint
-        problem.add_constraint(schur >> 0)
+        problem.add_constraint(schur >= 0)
 
     # Kron constraint
     problem.add_constraint(pic.kron(A, I) * cov_array_param == delta_array)
@@ -259,7 +259,7 @@ def team_opt2(adj_mat, current_weights, covariance_matrices, how='geom', ne=1):
     problem.add_constraint(
         (A * np.ones((n, 1))) == np.ones((n, 1)))  # Constraint 1
     problem.add_constraint((beta * np.dot(np.ones(n).T, np.ones(n))) +
-                           (1 - mu) * np.eye(n) >> A)  # Constraint 2
+                           (1 - mu) * np.eye(n) >= A)  # Constraint 2
 
     for i in range(n):
         problem.add_constraint(A[i, i] > 0)  # Constraint 6
