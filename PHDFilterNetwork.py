@@ -1,15 +1,25 @@
 import math
 import networkx as nx
+from numba import jit, njit, cuda
 import numpy as np
 from operator import attrgetter
 import pandas as pd
+import platform
 import scipy
 from scipy.spatial.distance import mahalanobis
 
-from optimization_utils import *
 from ospa import *
-from reconfig_utils import *
 from target import Target
+
+#from optimization_utils import *
+#from reconfig_utils import *
+if platform.system() == 'Linux':
+    print('loading in files with jit')
+    from optimization_utils_jit import *
+    from reconfig_utils_jit import *
+else:
+    from optimization_utils import *
+    from reconfig_utils import *
 
 
 class PHDFilterNetwork:
