@@ -141,6 +141,7 @@ class PHDFilterNetwork:
             2) Geometric or Arithmetic Fusion
             3) Rescaling fused weights according to cardinality consensus
             """
+            L = int(max(3.0, len(nodes) / 2.0))
             for l in range(L):
                 self.cardinality_consensus()
                 self.fuse_components(how=how)
@@ -1050,7 +1051,6 @@ class PHDFilterNetwork:
         return (numer / denom) ** 0.5
 
     @staticmethod
-    @jit
     def get_mahalanobis(target1, target2):
         d = mahalanobis(target1.state, target2.state,
                         np.linalg.inv(target1.state_cov))
