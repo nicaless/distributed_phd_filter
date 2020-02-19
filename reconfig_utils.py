@@ -1,8 +1,6 @@
 from copy import deepcopy
 import numpy as np
 import platform
-import warnings
-warnings.filterwarnings("error")
 
 
 def generate_coords(new_config, current_coords, fov, target_estimate,
@@ -51,10 +49,7 @@ def generate_coords(new_config, current_coords, fov, target_estimate,
             if propose_E < current_E:
                 new_coords = deepcopy(propose_coords)
             else:
-                try:
-                    p_accept = np.exp((-1 * (propose_E - current_E)) / T)
-                except RuntimeWarning:
-                    pass
+                p_accept = np.exp((-1 * (propose_E - current_E)) / T)
                 accept_criteria = np.random.uniform(0, 1)
                 if accept_criteria < p_accept:
                     new_coords = deepcopy(propose_coords)
@@ -207,7 +202,5 @@ def ph(x, H):
     """
     if x < 0:
         return 0
-    try:
+    else:
         return np.exp(H * x)
-    except RuntimeWarning:
-        pass

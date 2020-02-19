@@ -297,16 +297,19 @@ class PHDFilterNetwork:
                 if np.linalg.det(cov_data[neighbor_id]) < best_cov:
                     best_cov_id = neighbor_id
 
-        new_config = self.adjacency_matrix()
-        new_config[failed_node, best_cov_id] = 1
-        new_config[best_cov_id, failed_node] = 1
+        if best_cov_id is None:
+            pass
+        else:
+            new_config = self.adjacency_matrix()
+            new_config[failed_node, best_cov_id] = 1
+            new_config[best_cov_id, failed_node] = 1
 
-        G = nx.from_numpy_matrix(new_config)
-        self.network = G
-        nx.set_node_attributes(self.network, nodes, 'node')
+            G = nx.from_numpy_matrix(new_config)
+            self.network = G
+            nx.set_node_attributes(self.network, nodes, 'node')
 
-        new_weights = self.get_metro_weights()
-        nx.set_node_attributes(self.network, new_weights, 'weights')
+            new_weights = self.get_metro_weights()
+            nx.set_node_attributes(self.network, new_weights, 'weights')
 
     def do_random_opt(self, failed_node):
         nodes = nx.get_node_attributes(self.network, 'node')
@@ -317,18 +320,21 @@ class PHDFilterNetwork:
             if neighbor_id not in current_neighbors:
                 non_neighbors.append(neighbor_id)
 
-        new_neighbor_id = np.random.choice(non_neighbors)
+        if len(non_neighbors) == 0:
+            pass
+        else:
+            new_neighbor_id = np.random.choice(non_neighbors)
 
-        new_config = self.adjacency_matrix()
-        new_config[failed_node, new_neighbor_id] = 1
-        new_config[new_neighbor_id, failed_node] = 1
+            new_config = self.adjacency_matrix()
+            new_config[failed_node, new_neighbor_id] = 1
+            new_config[new_neighbor_id, failed_node] = 1
 
-        G = nx.from_numpy_matrix(new_config)
-        self.network = G
-        nx.set_node_attributes(self.network, nodes, 'node')
+            G = nx.from_numpy_matrix(new_config)
+            self.network = G
+            nx.set_node_attributes(self.network, nodes, 'node')
 
-        new_weights = self.get_metro_weights()
-        nx.set_node_attributes(self.network, new_weights, 'weights')
+            new_weights = self.get_metro_weights()
+            nx.set_node_attributes(self.network, new_weights, 'weights')
 
 
     """

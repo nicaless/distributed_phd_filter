@@ -9,7 +9,7 @@ from scipy.linalg import block_diag
 
 
 def magnitude(x):
-    return int(math.log10(x))
+    return int(math.log10(abs(x)))
 
 
 def agent_opt(adj_mat, current_weights, covariance_data, ne=1, failed_node=None):
@@ -32,9 +32,9 @@ def agent_opt(adj_mat, current_weights, covariance_data, ne=1, failed_node=None)
 
     # Reducing Magnitude if necessary
     magnitude_covs = [magnitude(cov) for cov in covariance_data]
-    if max(magnitude_covs) > 17:
+    if max(magnitude_covs) > 15:
         print('rescaling matrix magnitude, magnitude too high')
-        covariance_data = [cov * 10 ** max(magnitude_covs)
+        covariance_data = [cov * (10 ** (-1 * max(magnitude_covs)))
                            for cov in covariance_data]
 
     # Init Problem
@@ -174,11 +174,11 @@ def team_opt2(adj_mat, current_weights, covariance_matrices, how='geom', ne=1):
     p_size = n * s
 
     # Reducing Magnitude if necessary
-    mag_max_val_in_matrices = magnitude(max([np.max(cov)
+    mag_max_val_in_matrices = magnitude(max([np.max(abs(cov))
                                              for cov in covariance_matrices]))
-    if mag_max_val_in_matrices > 17:
+    if mag_max_val_in_matrices > 15:
         print('rescaling matrix magnitude, magnitude too high')
-        covariance_matrices = [cov * 10 ** mag_max_val_in_matrices
+        covariance_matrices = [cov * (10 ** (-1 * mag_max_val_in_matrices))
                                for cov in covariance_matrices]
 
     cov_array = np.zeros((n * s, s))
