@@ -3,7 +3,6 @@ from numba import jit, cuda
 import numpy as np
 import platform
 
-@jit
 def generate_coords(new_config, current_coords, fov, target_estimate,
                     bbox=np.array([(-50, 50), (-50, 50), (10, 100)]),
                     delta=10, safe_dist=10, connect_dist=25, k=-0.1, steps=1000,
@@ -54,7 +53,7 @@ def generate_coords(new_config, current_coords, fov, target_estimate,
                 accept_criteria = np.random.uniform(0, 1)
                 if accept_criteria < p_accept:
                     new_coords = deepcopy(propose_coords)
-            #del propose_coords
+            del propose_coords
 
         valid_config = isValidConfig(new_config, new_coords,
                                      safe_dist, connect_dist, bbox)

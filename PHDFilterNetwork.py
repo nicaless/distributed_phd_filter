@@ -1043,12 +1043,14 @@ class PHDFilterNetwork:
         return K
 
     @staticmethod
+    @njit
     def rescaler(cov, weight):
         numer = np.linalg.det(2 * np.pi * np.linalg.inv(cov / weight))
         denom = np.linalg.det(2 * np.pi * cov) ** weight
         return (numer / denom) ** 0.5
 
     @staticmethod
+    @jit
     def get_mahalanobis(target1, target2):
         d = mahalanobis(target1.state, target2.state,
                         np.linalg.inv(target1.state_cov))
