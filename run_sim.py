@@ -34,7 +34,7 @@ else:
     fails_before_saturation = num_nodes * (num_nodes - 1) / 2 - (num_nodes - 1)
 fail_freq = int(np.ceil(total_time_steps / fails_before_saturation))
 # fail_int = [5, 10, 15, 20, 25, 30, 35, 40, 45]  # time steps at which failure occurs
-fail_int = list(range(0, total_time_steps, fail_freq))  # time steps at which failure occurs
+fail_int = list(range(1, total_time_steps, fail_freq))  # time steps at which failure occurs (no failure on first time step)
 x_start = -50 + (100.0 / (num_nodes + 1))  # init x coord of first node
 pos_start = np.array([x_start, 0, 20])  # init x coord for all nodes
 pos_init_dist = np.floor(100.0 / (num_nodes + 1))  # init x dist between nodes
