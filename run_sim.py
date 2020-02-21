@@ -11,20 +11,22 @@ from PHDFilterNode import PHDFilterNode
 from SimGenerator import SimGenerator
 from target import Target
 
-np.random.seed(42)
-
 """
 Params
 """
 parser = argparse.ArgumentParser()
 parser.add_argument('num', type=int, default=3)
 parser.add_argument('run_name', default='3_nodes')
+parser.add_argument('seed', type=int, default=42)
 parser.add_argument('--single_node_fail', help='Only one node will experience failure', action='store_true')
 args = parser.parse_args()
 
 num_nodes = args.num
 run_name = args.run_name
+random_seed = args.seed
 single_node_fail = args.single_node_fail
+
+np.random.seed(random_seed)
 
 total_time_steps = 50
 region = [(-50, 50), (-50, 50)]  # simulation space
