@@ -83,7 +83,13 @@ for m in ['errors', 'max_tr_cov', 'mean_tr_cov', 'ospa', 'nmse']:
                         topology_dir = dir + '/topologies'
                         num_drones = n
                         num_possible_edges = (n * (n - 1)) / 2
-                        for t in range(50):
+
+                        fails_before_saturation = num_drones * (num_drones - 1) / 2 - (num_drones - 1)
+                        fail_freq = int(np.ceil(50 / fails_before_saturation))
+                        fail_int = list(range(1, 50, fail_freq))
+                        fail_int_stagger = list(range(0, 50, fail_freq))
+                        # for t in range(50):
+                        for t in fail_int:
                             edge_count = 0
                             new_A = []
                             f_name = '{dir}/{t}.csv'.format(dir=topology_dir,
@@ -106,8 +112,9 @@ for m in ['errors', 'max_tr_cov', 'mean_tr_cov', 'ospa', 'nmse']:
     df = pd.DataFrame([time_val, diffs, edge_density, trial_code])
     df = df.transpose()
     df.columns = ['time', 'diff', 'edge_density', 'trial_code']
-    df['failure_label'] = df['time'] / 5
-    df['failure_label'] = df['failure_label'].apply(lambda x: np.floor(x))
+    df['failure_label'] = df['time']
+    # df['failure_label'] = df['time'] / 5
+    # df['failure_label'] = df['failure_label'].apply(lambda x: np.floor(x))
     save_file_name = '{m}.csv'.format(m=m)
     df.to_csv(save_file_name)
 
@@ -143,15 +150,14 @@ for m in ['errors', 'max_tr_cov', 'mean_tr_cov', 'ospa', 'nmse']:
         else:
             lab = 'RandomGMC'
 
-        if m in ['ospa', 'nmse'] and (c == 'arith_agent' or c == 'geom_agent'):
-            empty = pd.DataFrame([[10, 0, 0.6 + (np.random.rand() * .1)],
-                                  [11, 0, 0.7 + (np.random.rand() * .1)],
-                                  [12, 0, 0.8 + (np.random.rand() * .1)]],
-                                 columns=['failure_label',
-                                          'diff',
-                                          'edge_density'])
-            group_fail = pd.concat([group_fail, empty])
-
+        # if m in ['ospa', 'nmse'] and (c == 'arith_agent' or c == 'geom_agent'):
+        #     empty = pd.DataFrame([[10, 0, 0.6 + (np.random.rand() * .1)],
+        #                           [11, 0, 0.7 + (np.random.rand() * .1)],
+        #                           [12, 0, 0.8 + (np.random.rand() * .1)]],
+        #                          columns=['failure_label',
+        #                                   'diff',
+        #                                   'edge_density'])
+        #     group_fail = pd.concat([group_fail, empty])
 
         plt.scatter(group_fail['edge_density'], group_fail['diff'], label=lab)
 

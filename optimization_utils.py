@@ -89,9 +89,9 @@ def agent_opt(adj_mat, current_weights, covariance_data, ne=1, failed_node=None)
         new_weights[i][i] = nw
         new_config[i, i] = 1
         for j in range(i + 1, n):
-            new_config[i, j] = round(PI[i, j].value)
-            new_config[j, i] = round(PI[j, i].value)
-            if new_config[i, j] == 1:
+            if round(PI[i, j].value) == 1:
+                new_config[i, j] = round(PI[i, j].value)
+                new_config[j, i] = round(PI[j, i].value)
                 nw = A[i, j].value
                 if nw == 0:
                     nw = 0.1
@@ -298,9 +298,9 @@ def team_opt2(adj_mat, current_weights, covariance_matrices, how='geom', ne=1):
         new_weights[i][i] = nw
         new_config[i, i] = 1
         for j in range(i + 1, n):
-            new_config[i, j] = round(PI[i, j].value)
-            new_config[j, i] = round(PI[j, i].value)
-            if new_config[i, j] == 1:
+            if round(PI[i, j].value) == 1:
+                new_config[i, j] = round(PI[i, j].value)
+                new_config[j, i] = round(PI[j, i].value)
                 nw = A[i, j].value
                 if nw == 0:
                     nw = 0.1
