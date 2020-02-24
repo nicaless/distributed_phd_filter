@@ -83,6 +83,7 @@ class PHDFilterNetwork:
     def step_through(self, measurements, true_targets,
                      L=3, how='geom', opt='agent',
                      fail_int=None, fail_sequence=None,
+                     single_node_fail=False,
                      base=False, noise_mult=1):
         nodes = nx.get_node_attributes(self.network, 'node')
 
@@ -96,11 +97,11 @@ class PHDFilterNetwork:
                 if fail_int is not None:
                     if i in fail_int:
                         failure = True
-                        fail_node = self.apply_failure(i, mult=noise_mult)
+                        fail_node = self.apply_failure(i, mult=noise_mult, single_node_fail=single_node_fail)
                 else:
                     if i in fail_sequence:
                         failure = True
-                        fail_node = self.apply_failure(i, fail=fail_sequence[i])
+                        fail_node = self.apply_failure(i, fail=fail_sequence[i], single_node_fail=single_node_fail)
 
             """
             Local PHD Estimation
@@ -159,12 +160,15 @@ class PHDFilterNetwork:
             self.adjacencies[i] = self.adjacency_matrix()
             self.weighted_adjacencies[i] = self.weighted_adjacency_matrix()
 
-    def apply_failure(self, i, fail=None, mult=1):
+    def apply_failure(self, i, fail=None, mult=1, single_node_fail=False):
         nodes = nx.get_node_attributes(self.network, 'node')
 
         # Generate new R
         if fail is None:
-            fail_node = np.random.choice(list(nodes.keys()))
+            if single_node_fail:
+                fail_node = 0
+            else:
+                fail_node = np.random.choice(list(nodes.keys()))
 
             # Get R from Node
             R = nodes[fail_node].R
