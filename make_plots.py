@@ -63,6 +63,14 @@ for m in ['errors', 'max_tr_cov', 'mean_tr_cov', 'ospa', 'nmse']:
                         continue
                     data = pd.read_csv(fname)
 
+                    num_drones = n
+                    fails_before_saturation = num_drones * (num_drones - 1) / 2 - (num_drones - 1)
+                    fail_freq = int(np.ceil(50 / fails_before_saturation))
+                    fail_int = list(range(1, 50, fail_freq))
+                    fail_int_stagger = list(range(0, 50, fail_freq))
+
+                    data = data[data['time'].isin(fail_int)]
+
                     # Calculate Difference from Base
                     if opt == 'base':
                         base = data['value'].values
@@ -81,13 +89,8 @@ for m in ['errors', 'max_tr_cov', 'mean_tr_cov', 'ospa', 'nmse']:
                         time_val.extend(data['time'].values)
 
                         topology_dir = dir + '/topologies'
-                        num_drones = n
                         num_possible_edges = (n * (n - 1)) / 2
 
-                        fails_before_saturation = num_drones * (num_drones - 1) / 2 - (num_drones - 1)
-                        fail_freq = int(np.ceil(50 / fails_before_saturation))
-                        fail_int = list(range(1, 50, fail_freq))
-                        fail_int_stagger = list(range(0, 50, fail_freq))
                         # for t in range(50):
                         for t in fail_int:
                             edge_count = 0
