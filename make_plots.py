@@ -81,8 +81,8 @@ for m in ['errors', 'max_tr_cov', 'mean_tr_cov', 'ospa', 'nmse']:
                             base_dir = top_dir + '/' + node_dir + '/' + team_base_dir
                             fname = base_dir + '/{m}.csv'.format(m=m)
                             team_base_data = pd.read_csv(fname)
+                            team_base_data = team_base_data[team_base_data['time'].isin(fail_int)]
                             base = team_base_data['value'].values
-                            base = base[base['time'].isin(fail_int)]
 
                         v = data['value'].values
                         diff = base - v
