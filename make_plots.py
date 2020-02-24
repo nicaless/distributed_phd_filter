@@ -25,10 +25,11 @@ mpl.rcParams.update(params)
 """
 Params
 """
-run_name = '3_nodes_test'
+run_name = 'vary_fail_events'
 
-node_dir_plot = '3_nodes'
-trial_name = node_dir_plot + '/0_arith_agent'
+node_dir_plot = '5_nodes'
+trial_name = node_dir_plot + '/1_geom_team'
+node_list = [5, 6, 7]
 
 
 """
@@ -44,20 +45,12 @@ for m in ['errors', 'max_tr_cov', 'mean_tr_cov', 'ospa', 'nmse']:
     edge_density = []
     trial_code = []
 
-    # for n in [5, 6, 7, 10, 12]:
-    for n in [3]:
+    for n in node_list:
         for how in ['arith', 'geom']:
             base = None
             for opt in ['base', 'agent', 'greedy', 'random', 'team']:
-                if opt == 'team' and n > 7:
-                    continue
-                # for trial in range(5):
-                for trial in range(1):
+                for trial in range(5):
                     top_dir = run_name
-                    # if opt == 'team':
-                    #     top_dir = run_name + '_team'
-                    # else:
-                    #     top_dir = run_name
 
                     # Read Metric Data
                     node_dir = '{n}_nodes'.format(n=n)
@@ -88,8 +81,7 @@ for m in ['errors', 'max_tr_cov', 'mean_tr_cov', 'ospa', 'nmse']:
                         topology_dir = dir + '/topologies'
                         num_drones = n
                         num_possible_edges = (n * (n - 1)) / 2
-                        # for t in range(50):
-                        for t in range(20):
+                        for t in range(50):
                             edge_count = 0
                             new_A = []
                             f_name = '{dir}/{t}.csv'.format(dir=topology_dir,
@@ -167,8 +159,8 @@ for m in ['errors', 'max_tr_cov', 'mean_tr_cov', 'ospa', 'nmse']:
         # fit_x = list(np.arange(0.3, max(group_fail['edge_density']) + 0.1, 0.1))
         # plt.plot(fit_x, b + slope * np.asarray(fit_x), '-')
 
-    plt.hlines(0, 0.3, 0.9,
-               linestyles='dashed')
+    # plt.hlines(0, 0.3, 0.9,
+    #            linestyles='dashed')
 
     plt.legend()
     plt.xlabel('Edge Density')
@@ -182,21 +174,15 @@ for m in ['errors', 'max_tr_cov', 'mean_tr_cov', 'ospa', 'nmse']:
 Plot Time Series for Covariance, for n = 7
 """
 for agg in ['mean', 'max', 'ospa']:
-    # for n in [5, 6, 7]:
-    for n in [3]:
+    for n in [7]:
         for how in ['arith', 'geom']:
             for opt in ['agent', 'greedy', 'random', 'team']:
                 top_dir = run_name
-                # if opt == 'team':
-                #     top_dir = run_name + '_team'
-                # else:
-                #     top_dir = run_name
 
                 time_val = []
                 data_val = []
 
-                # for trial in range(5):
-                for trial in range(1):
+                for trial in range(5):
                     # Read Metric Data
                     node_dir = '{n}_nodes'.format(n=n)
                     trial_dir = '{t}_{h}_{o}'.format(t=trial,
@@ -265,142 +251,142 @@ for agg in ['mean', 'max', 'ospa']:
 """
 Read in Data for Drone Plots
 """
-if trial_name is not None:
-    topology_dir = run_name + '/' + trial_name + '/topologies'
-    edge_list = {}
-    num_drones = 0
-    # timesteps = 50
-    timesteps = 20
-    for t in range(int(timesteps)):
-        edge_list[t] = []
-        new_A = []
-        f_name = '{dir}/{t}.csv'.format(dir=topology_dir, t=t)
-        with open(f_name, 'r') as f:
-            readCSV = csv.reader(f, delimiter=',')
-            for row in readCSV:
-                data = list(map(float, row))
-                new_A.append(data)
-        new_A = np.array(new_A)
-        num_drones = new_A.shape[0]
-        for i in range(num_drones):
-            for j in range(i + 1, num_drones):
-                if new_A[i, j] == 1:
-                    edge_list[t].append((i, j))
-
-    true_positions = pd.read_csv(run_name + '/' +
-                                 node_dir_plot +
-                                 '/true_positions.csv')
-    true_positions['z'] = 5
-    timesteps = max(true_positions['time'] + 1)
-
-    estimates = pd.read_csv(run_name + '/' + trial_name + '/estimates.csv')
-    estimates['z'] = 5
-
-    node_positions = pd.read_csv(run_name + '/' + trial_name +
-                                 '/robot_positions.csv')
-
-
-    """
-    Plot Overhead View
-    """
-    if not os.path.exists(run_name + '/' + trial_name + '/overhead'):
-        os.makedirs(run_name + '/' + trial_name + '/overhead')
-
-    for t in range(int(timesteps)):
-        ax = plt.axes()
-        plt.xlim((-50, 50))
-        plt.ylim((-50, 50))
-
-        # Plot Targets
-        tp_tmp = true_positions[true_positions['time'] == t]
-        ax.scatter(tp_tmp['x'], tp_tmp['y'], s=30, color='black',
-                   marker='+')
-
-        # Plot Estimates
-        e_tmp = estimates[estimates['time'] == t]
-        ax.scatter(e_tmp['x'], e_tmp['y'], s=20, color='orange', alpha=0.2)
-
-        node_tmp = node_positions[node_positions['time'] == t]
-
-        # Plot Drones
-        ax.scatter(node_tmp['x'], node_tmp['y'], s=30, color='blue',
-                   marker='^')
-
-        # Plot Adjacencies
-        for edge_index, edges in enumerate(edge_list[t]):
-            i = edges[0]
-            j = edges[1]
-            i_pos = node_tmp[node_tmp['node_id'] == i]
-            j_pos = node_tmp[node_tmp['node_id'] == j]
-
-            xl = [i_pos['x'].values[0], j_pos['x'].values[0]]
-            yl = [i_pos['y'].values[0], j_pos['y'].values[0]]
-            plt.plot(xl, yl, color='gray', alpha=0.3)
-
-        # Plot FOVs
-        for n in range(int(num_drones)):
-            pos = node_tmp[node_tmp['node_id'] == n]
-            p = plt.Circle((pos['x'].values[0], pos['y'].values[0]),
-                           pos['fov_radius'].values[0], alpha=0.1)
-            ax.add_patch(p)
-
-        plt.savefig(run_name + '/' +
-                    trial_name + '/overhead/{t}.png'.format(t=t),
-                    bbox_inches='tight')
-        plt.clf()
-
-
-    """
-    Plot 3d View
-    """
-    if not os.path.exists(run_name + '/' + trial_name + '/3ds'):
-        os.makedirs(run_name + '/' + trial_name + '/3ds')
-
-    for t in range(int(timesteps)):
-        ax = plt.axes(projection='3d')
-        ax.set_xlim(-50, 50)
-        ax.set_ylim(-50, 50)
-        ax.set_zlim(0, 50)
-
-        # Plot Targets
-        tp_tmp = true_positions[true_positions['time'] == t]
-        ax.scatter(tp_tmp['x'], tp_tmp['y'], tp_tmp['z'], color='black',
-                   marker='+')
-
-        # Plot Estimates
-        e_tmp = estimates[estimates['time'] == t]
-        ax.scatter(e_tmp['x'], e_tmp['y'], e_tmp['z'], color='orange')
-
-        # Plot Node Positions
-        node_tmp = node_positions[node_positions['time'] == t]
-        ax.scatter(node_tmp['x'].values,
-                   node_tmp['y'].values,
-                   node_tmp['z'].values, color='blue', marker='^')
-
-        # Plot FOVs
-        for n in range(int(num_drones)):
-            pos = node_tmp[node_tmp['node_id'] == n]
-            p = plt.Circle((pos['x'].values[0], pos['y'].values[0]),
-                           pos['fov_radius'].values[0], alpha=0.1)
-            ax.add_patch(p)
-            art3d.pathpatch_2d_to_3d(p, z=0.6, zdir="z")
-
-        # Plot Adjacencies
-        for edge_index, edges in enumerate(edge_list[t]):
-            i = edges[0]
-            j = edges[1]
-            i_pos = node_tmp[node_tmp['node_id'] == i]
-            j_pos = node_tmp[node_tmp['node_id'] == j]
-
-            xl = [i_pos['x'].values[0], j_pos['x'].values[0]]
-            yl = [i_pos['y'].values[0], j_pos['y'].values[0]]
-            zl = [i_pos['z'].values[0], j_pos['z'].values[0]]
-            ax.plot3D(xl, yl, zl, color='gray', alpha=0.3)
-
-        plt.savefig(run_name + '/' +
-                    trial_name + '/3ds/{t}.png'.format(t=t),
-                    bbox_inches='tight')
-        plt.clf()
+# if trial_name is not None:
+#     topology_dir = run_name + '/' + trial_name + '/topologies'
+#     edge_list = {}
+#     num_drones = 0
+#     # timesteps = 50
+#     timesteps = 20
+#     for t in range(int(timesteps)):
+#         edge_list[t] = []
+#         new_A = []
+#         f_name = '{dir}/{t}.csv'.format(dir=topology_dir, t=t)
+#         with open(f_name, 'r') as f:
+#             readCSV = csv.reader(f, delimiter=',')
+#             for row in readCSV:
+#                 data = list(map(float, row))
+#                 new_A.append(data)
+#         new_A = np.array(new_A)
+#         num_drones = new_A.shape[0]
+#         for i in range(num_drones):
+#             for j in range(i + 1, num_drones):
+#                 if new_A[i, j] == 1:
+#                     edge_list[t].append((i, j))
+#
+#     true_positions = pd.read_csv(run_name + '/' +
+#                                  node_dir_plot +
+#                                  '/true_positions.csv')
+#     true_positions['z'] = 5
+#     timesteps = max(true_positions['time'] + 1)
+#
+#     estimates = pd.read_csv(run_name + '/' + trial_name + '/estimates.csv')
+#     estimates['z'] = 5
+#
+#     node_positions = pd.read_csv(run_name + '/' + trial_name +
+#                                  '/robot_positions.csv')
+#
+#
+#     """
+#     Plot Overhead View
+#     """
+#     if not os.path.exists(run_name + '/' + trial_name + '/overhead'):
+#         os.makedirs(run_name + '/' + trial_name + '/overhead')
+#
+#     for t in range(int(timesteps)):
+#         ax = plt.axes()
+#         plt.xlim((-50, 50))
+#         plt.ylim((-50, 50))
+#
+#         # Plot Targets
+#         tp_tmp = true_positions[true_positions['time'] == t]
+#         ax.scatter(tp_tmp['x'], tp_tmp['y'], s=30, color='black',
+#                    marker='+')
+#
+#         # Plot Estimates
+#         e_tmp = estimates[estimates['time'] == t]
+#         ax.scatter(e_tmp['x'], e_tmp['y'], s=20, color='orange', alpha=0.2)
+#
+#         node_tmp = node_positions[node_positions['time'] == t]
+#
+#         # Plot Drones
+#         ax.scatter(node_tmp['x'], node_tmp['y'], s=30, color='blue',
+#                    marker='^')
+#
+#         # Plot Adjacencies
+#         for edge_index, edges in enumerate(edge_list[t]):
+#             i = edges[0]
+#             j = edges[1]
+#             i_pos = node_tmp[node_tmp['node_id'] == i]
+#             j_pos = node_tmp[node_tmp['node_id'] == j]
+#
+#             xl = [i_pos['x'].values[0], j_pos['x'].values[0]]
+#             yl = [i_pos['y'].values[0], j_pos['y'].values[0]]
+#             plt.plot(xl, yl, color='gray', alpha=0.3)
+#
+#         # Plot FOVs
+#         for n in range(int(num_drones)):
+#             pos = node_tmp[node_tmp['node_id'] == n]
+#             p = plt.Circle((pos['x'].values[0], pos['y'].values[0]),
+#                            pos['fov_radius'].values[0], alpha=0.1)
+#             ax.add_patch(p)
+#
+#         plt.savefig(run_name + '/' +
+#                     trial_name + '/overhead/{t}.png'.format(t=t),
+#                     bbox_inches='tight')
+#         plt.clf()
+#
+#
+#     """
+#     Plot 3d View
+#     """
+#     if not os.path.exists(run_name + '/' + trial_name + '/3ds'):
+#         os.makedirs(run_name + '/' + trial_name + '/3ds')
+#
+#     for t in range(int(timesteps)):
+#         ax = plt.axes(projection='3d')
+#         ax.set_xlim(-50, 50)
+#         ax.set_ylim(-50, 50)
+#         ax.set_zlim(0, 50)
+#
+#         # Plot Targets
+#         tp_tmp = true_positions[true_positions['time'] == t]
+#         ax.scatter(tp_tmp['x'], tp_tmp['y'], tp_tmp['z'], color='black',
+#                    marker='+')
+#
+#         # Plot Estimates
+#         e_tmp = estimates[estimates['time'] == t]
+#         ax.scatter(e_tmp['x'], e_tmp['y'], e_tmp['z'], color='orange')
+#
+#         # Plot Node Positions
+#         node_tmp = node_positions[node_positions['time'] == t]
+#         ax.scatter(node_tmp['x'].values,
+#                    node_tmp['y'].values,
+#                    node_tmp['z'].values, color='blue', marker='^')
+#
+#         # Plot FOVs
+#         for n in range(int(num_drones)):
+#             pos = node_tmp[node_tmp['node_id'] == n]
+#             p = plt.Circle((pos['x'].values[0], pos['y'].values[0]),
+#                            pos['fov_radius'].values[0], alpha=0.1)
+#             ax.add_patch(p)
+#             art3d.pathpatch_2d_to_3d(p, z=0.6, zdir="z")
+#
+#         # Plot Adjacencies
+#         for edge_index, edges in enumerate(edge_list[t]):
+#             i = edges[0]
+#             j = edges[1]
+#             i_pos = node_tmp[node_tmp['node_id'] == i]
+#             j_pos = node_tmp[node_tmp['node_id'] == j]
+#
+#             xl = [i_pos['x'].values[0], j_pos['x'].values[0]]
+#             yl = [i_pos['y'].values[0], j_pos['y'].values[0]]
+#             zl = [i_pos['z'].values[0], j_pos['z'].values[0]]
+#             ax.plot3D(xl, yl, zl, color='gray', alpha=0.3)
+#
+#         plt.savefig(run_name + '/' +
+#                     trial_name + '/3ds/{t}.png'.format(t=t),
+#                     bbox_inches='tight')
+#         plt.clf()
 
 
 """

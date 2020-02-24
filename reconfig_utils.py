@@ -23,11 +23,12 @@ def generate_coords(new_config, current_coords, fov, target_estimate,
     :return:
     """
 
-    if platform.system() == 'Linux':
-        invalid_iters_limit = 10
-        steps = 10000
-    else:
-        invalid_iters_limit = 5
+    invalid_iters_limit = 3
+    # if platform.system() == 'Linux':
+    #     invalid_iters_limit = 10
+    #     steps = 10000
+    # else:
+    #     invalid_iters_limit = 5
 
     # Simulated Annealing
     H = np.logspace(1, 3, steps)
