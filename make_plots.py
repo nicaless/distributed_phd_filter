@@ -29,7 +29,7 @@ run_name = 'vary_fail_events'
 
 node_dir_plot = '5_nodes'
 trial_name = node_dir_plot + '/1_geom_team'
-node_list = [5, 6, 7]
+node_list = [5, 6, 7, 10, 12, 15, 20, 25]
 
 
 """
@@ -82,6 +82,7 @@ for m in ['errors', 'max_tr_cov', 'mean_tr_cov', 'ospa', 'nmse']:
                             fname = base_dir + '/{m}.csv'.format(m=m)
                             team_base_data = pd.read_csv(fname)
                             base = team_base_data['value'].values
+                            base = base[base['time'].isin(fail_int)]
 
                         v = data['value'].values
                         diff = base - v
@@ -185,7 +186,7 @@ for m in ['errors', 'max_tr_cov', 'mean_tr_cov', 'ospa', 'nmse']:
 Plot Time Series for Covariance, for n = 7
 """
 for agg in ['mean', 'max', 'ospa']:
-    for n in [7]:
+    for n in [25]:
         for how in ['arith', 'geom']:
             for opt in ['agent', 'greedy', 'random', 'team']:
                 top_dir = run_name
