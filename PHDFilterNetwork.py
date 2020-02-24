@@ -260,17 +260,18 @@ class PHDFilterNetwork:
                                             current_weights,
                                             covariance_data,
                                             failed_node=failed_node)
-
-        # G = nx.from_numpy_matrix(new_config)
-        # self.network = G
-        # nx.set_node_attributes(self.network, nodes, 'node')
-        # nx.set_node_attributes(self.network, new_weights, 'weights')
+        # print(current_weights)
+        # print(new_weights)
         G = nx.from_numpy_matrix(new_config)
         self.network = G
         nx.set_node_attributes(self.network, nodes, 'node')
-
-        new_weights = self.get_metro_weights()
         nx.set_node_attributes(self.network, new_weights, 'weights')
+        # G = nx.from_numpy_matrix(new_config)
+        # self.network = G
+        # nx.set_node_attributes(self.network, nodes, 'node')
+        #
+        # new_weights = self.get_metro_weights()
+        # nx.set_node_attributes(self.network, new_weights, 'weights')
 
     def do_team_opt(self, how='geom'):
         nodes = nx.get_node_attributes(self.network, 'node')
@@ -286,17 +287,18 @@ class PHDFilterNetwork:
                                             current_weights,
                                             cov_data,
                                             how=how)
-
-        # G = nx.from_numpy_matrix(new_config)
-        # self.network = G
-        # nx.set_node_attributes(self.network, nodes, 'node')
-        # nx.set_node_attributes(self.network, new_weights, 'weights')
+        # print(current_weights)
+        # print(new_weights)
         G = nx.from_numpy_matrix(new_config)
         self.network = G
         nx.set_node_attributes(self.network, nodes, 'node')
-
-        new_weights = self.get_metro_weights()
         nx.set_node_attributes(self.network, new_weights, 'weights')
+        # G = nx.from_numpy_matrix(new_config)
+        # self.network = G
+        # nx.set_node_attributes(self.network, nodes, 'node')
+        #
+        # new_weights = self.get_metro_weights()
+        # nx.set_node_attributes(self.network, new_weights, 'weights')
 
     def do_greedy_opt(self, failed_node, how='geom'):
         nodes = nx.get_node_attributes(self.network, 'node')
