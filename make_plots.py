@@ -59,6 +59,8 @@ for m in ['errors', 'max_tr_cov', 'mean_tr_cov', 'ospa', 'nmse']:
                                                      o=opt)
                     dir = top_dir + '/' + node_dir + '/' + trial_dir
                     fname = dir + '/{m}.csv'.format(m=m)
+                    if not os.path.exists(fname):
+                        continue
                     data = pd.read_csv(fname)
 
                     # Calculate Difference from Base
@@ -193,6 +195,8 @@ for agg in ['mean', 'max', 'ospa']:
                         fname = dir + '/{agg}.csv'.format(agg=agg)
                     else:
                         fname = dir + '/{agg}_tr_cov.csv'.format(agg=agg)
+                    if not os.path.exists(fname):
+                        continue
                     data = pd.read_csv(fname)
                     data = data.replace([np.inf, -np.inf], np.nan)
                     data = data.fillna(data.mean())

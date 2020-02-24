@@ -260,8 +260,8 @@ class PHDFilterNetwork:
                                             current_weights,
                                             covariance_data,
                                             failed_node=failed_node)
-        # print(current_weights)
-        # print(new_weights)
+        print(current_weights)
+        print(new_weights)
         G = nx.from_numpy_matrix(new_config)
         self.network = G
         nx.set_node_attributes(self.network, nodes, 'node')
@@ -287,8 +287,8 @@ class PHDFilterNetwork:
                                             current_weights,
                                             cov_data,
                                             how=how)
-        # print(current_weights)
-        # print(new_weights)
+        print(current_weights)
+        print(new_weights)
         G = nx.from_numpy_matrix(new_config)
         self.network = G
         nx.set_node_attributes(self.network, nodes, 'node')
