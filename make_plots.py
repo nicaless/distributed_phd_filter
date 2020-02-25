@@ -29,7 +29,7 @@ run_name = 'vary_fail_events'
 
 node_dir_plot = '5_nodes'
 trial_name = node_dir_plot + '/1_geom_team'
-node_list = [5, 6, 7, 10, 12, 15, 20, 25]
+node_list = [5, 6, 7, 10, 12, 15, 20, 25, 30]
 
 
 """
@@ -162,8 +162,7 @@ for m in ['errors', 'max_tr_cov', 'mean_tr_cov', 'ospa', 'nmse']:
         #                                   'diff',
         #                                   'edge_density'])
         #     group_fail = pd.concat([group_fail, empty])
-
-        plt.scatter(group_fail['edge_density'], group_fail['diff'], label=lab)
+        plt.scatter(group_fail['edge_density'].round(2), group_fail['diff'], label=lab)
 
         # b, slope = np.polynomial.polynomial.polyfit(group_fail['edge_density'],
         #                                             group_fail['diff'], 1)
@@ -186,7 +185,7 @@ for m in ['errors', 'max_tr_cov', 'mean_tr_cov', 'ospa', 'nmse']:
 Plot Time Series for Covariance, for n = 7
 """
 for agg in ['mean', 'max', 'ospa']:
-    for n in [25]:
+    for n in [30]:
         for how in ['arith', 'geom']:
             for opt in ['agent', 'greedy', 'random', 'team']:
                 top_dir = run_name

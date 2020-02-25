@@ -31,6 +31,7 @@ def agent_opt(adj_mat, current_weights, covariance_data, ne=1, failed_node=None)
         node_bin[0][failed_node] = 1
 
     # Reducing Magnitude if necessary
+    covariance_data = np.nan_to_num(covariance_data)
     magnitude_covs = [magnitude(cov) for cov in covariance_data]
     if max(magnitude_covs) > 15:
         print('rescaling matrix magnitude, magnitude too high')

@@ -35,9 +35,6 @@ function run_sim_single_2 {
 export -f run_sim_single_2
 
 parallel --progress -j 0 << EOF
-run_sim 5
-run_sim 6
-run_sim 7
 run_sim 10
 run_sim 12
 run_sim 15

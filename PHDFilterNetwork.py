@@ -219,7 +219,7 @@ class PHDFilterNetwork:
         node_comps = node.targets
 
         if len(node_comps) == 1:
-            return node_comps[0]
+            return node_comps[0].state_cov
         else:
             bd = scipy.linalg.block_diag(node_comps[0].state_cov,
                                          node_comps[1].state_cov)
@@ -380,8 +380,10 @@ class PHDFilterNetwork:
         """
         local_estimates = {}
         for n in list(self.network.nodes()):
-            sum_weights = np.nansum([t.weight for t in nodes[n].targets])
-            local_estimates[n] = sum_weights
+            all_weights = [t.weight for t in nodes[n].targets]
+            sum_weights = np.nansum(all_weights)
+            tot_targets = len(all_weights)
+            local_estimates[n] = min([tot_targets, sum_weights])
 
         """
         Share Local Estimation with neighbors
@@ -411,7 +413,11 @@ class PHDFilterNetwork:
                 neighbor_weight = neighbor_weights[neighbor_id]
                 weighted_estimate += neighbor_weight * neighbor_estimate
             # TODO: is ceil the right way to go?
-            cardinality[node_id] = np.ceil(weighted_estimate)
+            if np.ceil(weighted_estimate) > len(nodes[node_id].targets):
+                c = len(nodes[node_id].targets)
+            else:
+                c = np.ceil(weighted_estimate)
+            cardinality[node_id] = c
         self.cardinality = cardinality
 
     def fuse_components(self, how='geom'):
