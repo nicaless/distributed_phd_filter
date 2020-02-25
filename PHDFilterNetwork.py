@@ -223,7 +223,7 @@ class PHDFilterNetwork:
         else:
             bd = scipy.linalg.block_diag(node_comps[0].state_cov,
                                          node_comps[1].state_cov)
-            for i in range(2, int(np.ceil(min_cardinality))):
+            for i in range(2, int(np.floor(min_cardinality))):
                 bd = scipy.linalg.block_diag(bd, node_comps[i].state_cov)
             return bd
 
@@ -232,7 +232,6 @@ class PHDFilterNetwork:
         min_cardinality_index = min(self.cardinality.keys(),
                                     key=(lambda k: self.cardinality[k]))
         min_cardinality = self.cardinality[min_cardinality_index]
-
 
         # get the covariance data
         cov_data = []
@@ -413,10 +412,10 @@ class PHDFilterNetwork:
                 neighbor_weight = neighbor_weights[neighbor_id]
                 weighted_estimate += neighbor_weight * neighbor_estimate
             # TODO: is ceil the right way to go?
-            if np.ceil(weighted_estimate) > len(nodes[node_id].targets):
+            if np.floor(weighted_estimate) > len(nodes[node_id].targets):
                 c = len(nodes[node_id].targets)
             else:
-                c = np.ceil(weighted_estimate)
+                c = np.floor(weighted_estimate)
             cardinality[node_id] = c
         self.cardinality = cardinality
 
@@ -443,9 +442,11 @@ class PHDFilterNetwork:
                                       for t in nodes[node_id].targets])
             new_estimate = self.cardinality[node_id]
             rescaler = new_estimate / old_estimate
-            for t in nodes[node_id].targets:
+            targets = nodes[node_id].targets
+            for t in targets:
                 t.weight = rescaler * t.weight
-
+            targets.sort(key=attrgetter('weight'), reverse=True)
+            nodes[node_id].targets = targets
 
     """
     Fusion Utils (for both Geometric and Arithmetic fusion)
