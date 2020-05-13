@@ -1,11 +1,13 @@
 import numpy as np
 import matplotlib.pyplot as plt
 from models import Resample
+import math
+from scipy.stats import norm
 
 
 class PHDFilter:
     def __init__(self,
-                 birth_model,
+                 birth_models,
                  clutter_model,
                  measurement_model,
                  transition_model,
@@ -13,15 +15,21 @@ class PHDFilter:
                  estimation_model,
                  init_targets=[],
                  init_weights=[],
-                 J=10
+                 J=10,
+                 region=[(-100, 100), (-100, 100)]
                  ):
-        self.birth_model = birth_model
+        # TODO: add region variable
+        # TODO: update birth, clutter, measurement(?) models according to region(s) in view
+        self.birth_models = birth_models
         self.clutter_model = clutter_model
         self.measurement_model = measurement_model
         self.transition_model = transition_model
         self.survival_model = survival_model
         self.estimation_model = estimation_model
         self.J = J
+        self.region = region
+        self.detection_probability = .98
+        self.clutter_prob = 0
 
         # set of tracked positions of all targets
         # TODO: change naming to 'particles' instead of targets
@@ -64,16 +72,75 @@ class PHDFilter:
 
         # Sample from Birth Model
         # Assign weights to new births
-        num_births, birth_pos = self.birth_model.Sample(max_N=self.J)
-        birth_weights = self.birth_model.Weight(num_births)
+        for birth_model in self.birth_models:
+            num_births, birth_pos = birth_model.Sample(max_N=self.J)
+            birth_weights = birth_model.Weight(num_births)
 
-        # Merge
-        new_positions = new_positions + birth_pos
-        new_weights = new_weights + birth_weights
+            # Merge
+            new_positions = new_positions + birth_pos
+            new_weights = new_weights + birth_weights
 
         self.predicted_pos = new_positions
         self.predicted_weights = new_weights
         self.predicted_num_targets = len(self.predicted_pos)
+
+    # for each measurement/particle combo calculate:
+    #   psi = detection_probability * probability we receive measurement at that particle position
+    #                                  (should be a func of distance between measure and particle, difference should be less than measurement variance)
+    # for each measurement calculate:
+    #   Ck = sum(psi * weight of particle)
+    # for each particle calculate:
+    #   1 - detection probability (detection_probability should be almost 1 if in FoV, 0 otherwise)
+    # + sum ( psi / clutter probability for measruement + Ck
+    # multiple above by old weight
+    def update2(self, measurements):
+        psi_mat = self.CalcPsi(measurements, self.predicted_pos)
+        Ck_m = self.CalcCk(psi_mat)
+
+        new_weights = []
+        for i, p in enumerate(self.predicted_pos):
+            sum_psi = 0
+            Ck = sum(Ck_m)
+            for m, m_psi in psi_mat.items():
+                sum_psi += m_psi[i]
+            w = (1 - self.DetectionProb(p)) + (sum_psi / Ck)
+            new_weights.append(w * self.predicted_weights[i])
+        self.updated_weights = new_weights
+
+    # psi = detection_prob * prob we receive measurement particle pos
+    def CalcPsi(self, measurements, positions, measurement_variance=1):
+        psi_mat = {}
+        for i, m in enumerate(measurements):
+            psi_mat[i] = []
+            x1 = m[0][0]
+            y1 = m[1][0]
+            for j, p in enumerate(positions):
+                x2 = p[0][0]
+                y2 = p[1][0]
+                dist = abs(math.sqrt((x2 - x1) ** 2 + (y2 - y1) ** 2))
+                prob_m_is_p = norm.sf(dist, 0, measurement_variance)
+                psi = self.DetectionProb((x2, y2)) * prob_m_is_p
+                psi_mat[i].append(psi)
+        return psi_mat
+
+    def DetectionProb(self, target):
+        x = target[0]
+        y = target[1]
+        if x < self.region[0][0] or x > self.region[0][1] \
+                or y < self.region[1][0] or y > self.region[1][1]:
+            return 0
+        else:
+            return self.detection_probability
+
+    # for each measurement calculate: Ck = sum(psi * weight of particle)
+    def CalcCk(self, psi_mat):
+        Ck_m = []
+        for i, particles_psi in psi_mat.items():
+            Ck = 0
+            for j, psi in enumerate(particles_psi):
+                Ck += psi * self.predicted_weights[j]
+            Ck_m.append(Ck)
+        return Ck_m
 
     def update(self, measurements):
         # Get the Weight Update
@@ -102,14 +169,14 @@ class PHDFilter:
                       weight_update
 
         self.updated_weights = new_weights
-        # print(self.updated_weights)
-        # print(np.sum(self.updated_weights))
 
     def resample(self):
         particle_mass = np.sum(self.updated_weights)
         true_target_indices = Resample(np.array(self.updated_weights) / particle_mass)
+        print(true_target_indices)
         true_particles = [self.predicted_pos[i] for i in true_target_indices]
-        true_weights = [self.updated_weights[i] for i in true_target_indices]
+        true_weights = [self.updated_weights[i] * np.ceil(particle_mass)
+                        for i in true_target_indices]
 
         self.resampled_pos = true_particles
         self.resampled_weights = true_weights
@@ -121,11 +188,18 @@ class PHDFilter:
             particle_positions_matrix[p][0] = self.resampled_pos[p][0]
             particle_positions_matrix[p][1] = self.resampled_pos[p][1]
         estimated_total_targets = int(np.ceil(np.sum(self.resampled_weights)))
-        centroids = self.estimation_model.estimate(particle_positions_matrix,
-                                                   estimated_total_targets)
-        self.centroids = centroids
 
-    def plot(self, k):
+        # TODO: fix...
+        estimated_total_targets = max(estimated_total_targets,
+                                      len(self.birth_models))
+        if len(self.resampled_pos) == 1:
+            self.centroids = particle_positions_matrix
+        else:
+            centroids = self.estimation_model.estimate(particle_positions_matrix,
+                                                       estimated_total_targets)
+            self.centroids = centroids
+
+    def plot(self, k, folder='results'):
         # plot all 4 steps
 
         # plot predicted new positions of particles
@@ -156,17 +230,18 @@ class PHDFilter:
         plt.scatter(x, y, label='centroid', color='black')
 
         plt.legend()
-        plt.savefig('results/{k}.png'.format(k=k))
+        plt.savefig('{folder}/{k}.png'.format(folder=folder, k=k))
         plt.clf()
 
     # TODO: add a reset
-    def step_through(self, measurements):
+    def step_through(self, measurements, folder='results'):
         for i, m in measurements.items():
+            print(i)
             self.predict()
             self.update(m)
             self.resample()
             self.estimate()
-            self.plot(i)
+            self.plot(i, folder=folder)
 
             self.targets[i] = self.resampled_pos
             self.current_targets = self.resampled_pos
@@ -194,6 +269,7 @@ class PHDFilter:
 
         plt.legend()
         plt.savefig('centroids.png')
+
 
 
 

@@ -4,8 +4,8 @@ Many models taken from https://github.com/rafaelkarrer/python-particle-phd-filte
 
 """
 
+import math
 import numpy as np
-import random
 import scipy.cluster.vq as vq
 from scipy.stats import multivariate_normal as mv_normal
 from scipy.stats import uniform
@@ -32,12 +32,21 @@ class Birth:
         positions = []
 
         for k in range(0, N):
-            x_center = (self.region[0][1] - self.region[0][0]) + \
-                       self.region[0][0]
-            y_center = (self.region[1][1] - self.region[1][0]) + \
-                       self.region[1][0]
-            x = np.random.poisson(x_center) + self.region[0][0]
-            y = np.random.poisson(y_center) + self.region[1][0]
+            # x_center = (self.region[0][1] - self.region[0][0]) + \
+            #            self.region[0][0]
+            # y_center = (self.region[1][1] - self.region[1][0]) + \
+            #            self.region[1][0]
+            # x_center = (self.region[0][1] - self.region[0][0]) / 2.
+            # y_center = (self.region[1][1] - self.region[1][0]) / 2.
+            # x = np.random.poisson(x_center) + self.region[0][0]
+            # y = np.random.poisson(y_center) + self.region[1][0]
+            # positions.append(np.array([[x], [y], [0.], [0.]]))
+
+            # uniform birth
+            x = np.random.uniform(low=self.region[0][0],
+                                  high=self.region[0][1])
+            y = np.random.uniform(low=self.region[1][0],
+                                  high=self.region[1][1])
             positions.append(np.array([[x], [y], [0.], [0.]]))
 
         # return newborn targets and positions
@@ -67,6 +76,30 @@ class Transition:
         next_state = np.dot(self.A, x) + np.dot(self.B, self.U)
         next_state[0, 0] = next_state[0, 0] + np.random.randn() * self.Q[0, 0]
         next_state[1, 0] = next_state[1, 0] + np.random.randn() * self.Q[1, 1]
+        return next_state
+
+
+class TransitionCircle:
+    def __init__(self, process_noise=0.1, step=3.):
+        self.A = np.array([[1, 0, 0, 0], [0, 1, 0, 0],
+                           [0, 0, 1, 0], [0, 0, 0, 0]])
+        self.B = np.array([[math.cos(0), 0],
+                           [math.sin(0), 0],
+                           [0.0, 1],
+                           [1.0, 0.0]])
+        self.U = np.array([[step, 0.1]]).T
+        self.Q = np.eye(4)
+        self.process_noise = process_noise
+
+    def AdvanceState(self, x):
+        self.B[0, 0] = 0.1 * math.cos(x[2, 0])
+        self.B[1, 0] = 0.1 * math.sin(x[2, 0])
+        next_state = np.dot(self.A, x) + \
+                     np.dot(self.B, self.U)
+        # Add small process noise
+        Qsim = np.diag([0.001, 0.001]) ** 2
+        next_state[0, 0] = next_state[0, 0] + np.random.randn() * Qsim[0, 0]
+        next_state[1, 0] = next_state[1, 0] + np.random.randn() * Qsim[1, 1]
         return next_state
 
 
@@ -115,6 +148,9 @@ class Measurement:
         return self.Likelihood((measurement[0:2,:] - target[0:2,:]).T) * \
                self.DetectionProbability(target)
 
+    # TODO: change to usual measurement model, filtered according to detection_function_output < detection_prob
+    # TODO: change detection_function to (kind of) match (15) and (16) page 12 in 2019 Dames paper
+    # TODO: detection_function -> poisson decay from center of SENSOR
     def Measure(self, target):
         sample = self.Sample(target.shape[1] * 2).T
         n = sample.reshape(4, target.shape[1])
@@ -179,7 +215,8 @@ class Estimate:
     # TODO: using KMeans for now... change to Lloyd's?
     @staticmethod
     def estimate(particles, estimated_number_targets):
-        x = vq.whiten(particles)
+        # x = vq.whiten(particles)
+        x = particles
         x_est, idx = vq.kmeans2(x, estimated_number_targets)
         return x_est
 
@@ -204,6 +241,4 @@ def Resample(weights):
             j += 1
 
     return np.unique(indexes)
-
-
 

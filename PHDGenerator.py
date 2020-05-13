@@ -9,7 +9,8 @@ class PHDGenerator:
                  measurement_model,
                  timesteps=200,
                  init_targets=[],
-                 region=[(-100, 100), (-100, 100)]):
+                 region=[(-100, 100), (-100, 100)],
+                 ppt=1):
 
         self.birth_model = birth_model
         self.clutter_model = clutter_model
@@ -17,14 +18,17 @@ class PHDGenerator:
         self.measurement_model = measurement_model
         self.timesteps = timesteps
         self.region = region
+        self.ppt = ppt
+        # TODO: set region for birth model, clutter model, measurement model(?)
 
         self.current_step = 0
         self.init_targets = init_targets
         self.last_timestep_targets = self.init_targets
         self.true_targets = {}  # true positions
-        self.true_observations = {}  # for true observations
-        self.clutter_observations = {}  # for clutter observations
-        self.observations = {}  # for true observations and clutter
+        self.birth_targets = {}  # new births
+        self.true_observations = {}  # for true particles
+        self.clutter_observations = {}  # for clutter particles
+        self.observations = {}  # for true and clutter particles
 
     def iterate(self, k):
         new_observations = []
@@ -37,25 +41,34 @@ class PHDGenerator:
             t = self.last_timestep_targets[i]
             # Apply Transition Model
             new_pos = self.transition_model.AdvanceState(t)
-            new_meas = self.measurement_model.Measure(t)
+            # Create X particles per target
+            n_particles = self.ppt
+            for p in range(n_particles):
+                new_meas = self.measurement_model.Measure(t)
 
-            if new_meas.size > 0:
-                new_observations.append(new_meas)
-                target_observations.append(new_meas)
-                next_timestep_targets.append(new_pos)
+                if new_meas.size > 0:
+                    new_observations.append(new_meas)
+                    target_observations.append(new_meas)
+            next_timestep_targets.append(new_pos)
 
         # Generate New Births
         num_births, birth_pos = self.birth_model.Sample()
+        self.birth_targets[k] = []
 
         # Add New Births and their observations to next survivors
         for i in range(0, num_births):
             t = birth_pos[i]
-            birth_meas = self.measurement_model.Measure(t)
+            # Create X particles per target
+            n_particles = self.ppt
+            for p in range(n_particles):
+                birth_meas = self.measurement_model.Measure(t)
 
-            if birth_meas.size > 0:
-                new_observations.append(birth_meas)
-                target_observations.append(birth_meas)
-                next_timestep_targets.append(t)
+                if birth_meas.size > 0:
+                    new_observations.append(birth_meas)
+                    target_observations.append(birth_meas)
+                # self.birth_targets[k].append(birth_meas)
+            self.birth_targets[k].append(t)
+            next_timestep_targets.append(t)
 
         # Generate Clutter and add to observations
         num_clutter, clutter_pos = self.clutter_model.Sample()
@@ -87,8 +100,10 @@ class PHDGenerator:
         self.observations = {}
 
     def plot_iter(self, k, folder='data', show_clutter=False):
-        plt.xlim([-100, 100])
-        plt.ylim([-100, 100])
+        plt.xlim([self.region[0][0], self.region[0][1]])
+        plt.ylim([self.region[1][0], self.region[1][1]])
+        # plt.xlim([-10, 10])
+        # plt.ylim([-10, 10])
 
         x = []
         y = []
@@ -104,6 +119,14 @@ class PHDGenerator:
             x_obs.append(o[0][0])
             y_obs.append(o[1][0])
         plt.scatter(x_obs, y_obs, label='true_observations')
+
+        x = []
+        y = []
+        for b in self.birth_targets[k]:
+            x.append(b[0][0])
+            y.append(b[1][0])
+
+        plt.scatter(x, y, label='new_births')
 
         if show_clutter:
             x_clutter = []
@@ -126,6 +149,15 @@ class PHDGenerator:
                 y.append(t[1][0])
 
         plt.scatter(x, y, label='true_position')
+
+        x = []
+        y = []
+        for i, births in self.birth_targets.items():
+            for b in births:
+                x.append(b[0][0])
+                y.append(b[1][0])
+
+        plt.scatter(x, y, label='new_births')
 
         x_obs = []
         y_obs = []
