@@ -1,24 +1,45 @@
-import math
 import numpy as np
-import scipy
+
+
+dt_1 = 0
+dt_2 = 0
+DEFAULT_INIT_STATE = np.array([[0.0], [0.0], [0.0], [0.0]])
+DEFAULT_INIT_COV = np.diag((0.01, 0.01, 0.01, 0.01))
+DEFAULT_A = np.array([[1, 0, dt_1, 0],
+                      [0, 1, 0, dt_2],
+                      [0, 0, 1, 0],
+                      [0, 0, 0, 1]])
+DEFAULT_B = np.array([[0, 0],
+                      [0, 0],
+                      [1, 0],
+                      [0, 1]])
+DEFAULT_H = np.eye(DEFAULT_INIT_STATE.shape[0])
 
 
 class Target:
     def __init__(self,
                  init_weight=1.0,
-                 init_state=np.array([[0.0], [0.0], [0.0], [0.0]]),
-                 init_cov=np.diag((0.01, 0.01, 0.01, 0.01)),
-                 process_noise=0.001,
-                 step=3,
-                 dt_1=1,
-                 dt_2=1,
-                 circle=False):
+                 init_state=DEFAULT_INIT_STATE,
+                 init_cov=DEFAULT_INIT_COV,
+                 A=DEFAULT_A,
+                 B=DEFAULT_B,
+                 H=DEFAULT_H,
+                 process_noise=0.001):
         self.state = init_state
         self.state_cov = init_cov
         self.weight = init_weight
         self.measure_cov = init_cov
-        self.dt_1 = dt_1
-        self.dt_2 = dt_2
+
+        self.A = A
+        self.B = B
+        self.U = np.zeros(B.shape[1])
+
+        self.Q = np.eye(init_state.shape[0])
+
+        self.H = H
+        self.R = np.eye(H.shape[0])
+
+        self.process_noise = process_noise
 
         self.all_states = []
         self.all_states.append(init_state)
@@ -26,44 +47,12 @@ class Target:
         self.all_cov = []
         self.all_cov.append(init_cov)
 
-        self.is_circle_trajectory = circle
-        if circle:
-            self.A = np.array([[1, 0, 0, 0], [0, 1, 0, 0],
-                               [0, 0, 1, 0], [0, 0, 0, 0]])
-            self.B = np.array([[math.cos(0), 0],
-                               [math.sin(0), 0],
-                               [0.0, 1],
-                               [1.0, 0.0]])
-            self.U = np.array([[step, 0.1]]).T
-        else:
-            self.state[2][0] = step
-            self.state[3][0] = step
-            self.A = np.array([[1, 0, dt_1, 0],
-                               [0, 1, 0, dt_2],
-                               [0, 0, 1, 0],
-                               [0, 0, 0, 1]])
-            self.B = np.eye(init_state.shape[0])
-            self.U = np.zeros((init_state.shape[0], 1))
-
-        self.Q = np.eye(init_state.shape[0])
-
-        self.H = np.array([[1, 0, 0, 0], [0, 1, 0, 0]])
-        self.R = np.eye(2)
-
-        self.process_noise = process_noise
-
-    def set_dir(self, dt_1, dt_2):
-        self.A = np.array([[1, 0, dt_1, 0],
-                           [0, 1, 0, dt_2],
-                           [0, 0, 1, 0],
-                           [0, 0, 0, 1]])
-
-    def next_state(self, noise=False):
+    def next_state(self, input=None, noise=False):
         x = self.state
-        if self.is_circle_trajectory:
-            self.B[0, 0] = 0.1 * math.cos(x[2, 0])
-            self.B[1, 0] = 0.1 * math.sin(x[2, 0])
-        next_state = np.dot(self.A, x) + np.dot(self.B, self.U)
+        if input is not None:
+            next_state = np.dot(self.A, x) + np.dot(self.B, input)
+        else:
+            next_state = np.dot(self.A, x) + np.dot(self.B, self.U)
 
         # Add small process noise
         if noise:
@@ -77,10 +66,11 @@ class Target:
         self.state_cov = next_cov
         self.all_cov.append(next_cov)
 
-    def get_measurement(self):
+    def get_measurement(self, R=None):
+        if R is None:
+            R = self.R
         obs = np.dot(self.H, self.state)
-        self.measure_cov = self.R + np.dot(self.H,
-                                           np.dot(self.state_cov, self.H.T))
+        self.measure_cov = R + np.dot(self.H, np.dot(self.state_cov, self.H.T))
 
         return obs
 
