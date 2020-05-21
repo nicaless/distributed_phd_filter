@@ -47,6 +47,13 @@ class Target:
         self.all_cov = []
         self.all_cov.append(init_cov)
 
+    def set_state_cov(self, state, cov):
+        self.state = state
+        self.state_cov = cov
+
+        self.all_states.append(state)
+        self.all_cov.append(cov)
+
     def next_state(self, input=None, noise=False):
         x = self.state
         if input is not None:

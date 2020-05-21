@@ -4,7 +4,7 @@ from numba import jit, njit, cuda
 import numpy as np
 from operator import attrgetter
 from scipy.spatial.distance import mahalanobis
-from scipy.linalg import orth
+from scipy.linalg import block_diag, orth
 
 from target import Target, DEFAULT_H
 
@@ -12,7 +12,7 @@ from target import Target, DEFAULT_H
 class DKFNode:
     def __init__(self,
                  node_id,
-                 target,
+                 targets,
                  position=np.array([0, 0, 0]),
                  region=[(-50, 50), (-50, 50)],
                  R_shape=DEFAULT_H.shape[0]
@@ -27,13 +27,19 @@ class DKFNode:
 
         self.gamma = 1
 
-        self.targets = [target]
+        self.full_state = None
+        self.full_cov = None
+        self.targets = targets
 
         # prediction results
+        self.full_state_prediction = None
+        self.full_cov_prediction = None
         self.predicted_pos = []
         self.predicted_targets = []
 
         # update results
+        self.full_state_update = None
+        self.full_cov_update = None
         self.measurements = []
         self.updated_targets = []
 
@@ -55,57 +61,111 @@ class DKFNode:
                        (y - self.fov, y + self.fov)]
 
     # TODO: Revise so thate states/cov is block diag of all targets
-    def predict(self, input=None):
+    def predict(self, inputs=None):
+        """
+        Makes prediction for all targets
+        :param input: array of all inputs
+        :return:
+        """
         # Existing Targets
         all_targets = self.targets
 
-        # Set R for All Targets then get measurement
+        # Set R for All Targets then get measurement and create new full state array
+        all_states = None
+        all_covs = None
+        all_inputs = None
         predicted_pos = []
-        for p in all_targets:
-            p.next_state(input=input)
+        for p in range(len(all_targets)):
+            all_states = all_targets[p].state if all_states is None else \
+                np.concatenate((all_states, all_targets[p].state))
 
-            p.R = self.R
-            new_meas = p.get_measurement()
-            predicted_pos.append(new_meas)
+            all_covs = all_targets[p].state_cov if all_covs is None else \
+                block_diag(all_covs, all_targets[p].state_cov)
+
+            U = inputs[p] if inputs[p] is not None else np.zeros(all_targets[p].B.shape[1])
+            all_inputs = U if all_inputs is None else np.concatenate((all_inputs, U))
+
+            all_targets[p].next_state(input=inputs[p])
+            predicted_pos.append(all_targets[p].state)
 
         self.predicted_pos = predicted_pos
         self.predicted_targets = all_targets
 
-    # TODO: Revise so thate states/cov is block diag of all targets
-    def update(self, measurements):
-        updated_targets = []
+        # Create Block Diag for A, B
+        A = None
+        B = None
+        for p in all_targets:
+            A = p.A if A is None else block_diag(A, p.A)
+            B = p.B if B is None else block_diag(B, p.B)
 
-        # TODO: use for loop to to create appropriate block diags
+        # Predict Full State
+        full_prediction = np.dot(A, all_states) + np.dot(B, all_inputs)
+        Q = np.eye(all_states.shape[0])  # no noise
+        full_cov = np.dot(A, np.dot(all_covs, A.T)) + Q
+
+        self.full_state_prediction = full_prediction
+        self.full_cov_prediction = full_cov
+
+    def get_measurements(self):
+        measurements = []
+        for p in self.predicted_targets:
+            new_meas = p.get_measurement(R=self.R)
+            measurements.append(new_meas)
+        return measurements
+
+    def update(self, measurements):
+        """
+        Updates target states based on measurements
+        :param measurements: array of all measurements
+        :return:
+        """
+
+        all_covs = None
+        all_measurements = None
+        H = None
+        R = None
+        G = None
         for i, m in enumerate(measurements):
+            all_covs = self.predicted_targets[i].state_cov if all_covs is None \
+                else np.concatenate((all_covs, self.predicted_targets[i].state_cov))
+            G = self.predicted_targets[i].B if G is None else block_diag(G, self.predicted_targets[i].B)
+
             if self.check_measure_oob(m) or \
                             np.random.rand() > self.detection_probability:
-                # TODO: don't include in blockdiag
-                measurement = self.measurements[i]
-                R = np.eye(self.R.shape[0])
+                H = np.zeros(self.predicted_targets[i].H.shape) if H is None else \
+                    block_diag(H, np.zeros(self.predicted_targets[i].H.shape))
+                continue
             else:
-                measurement = m
-                R = self.R
+                all_measurements = m if all_measurements is None else np.concatenate((all_measurements, m))
+                H = self.predicted_targets[i].H if H is None else block_diag(H, self.predicted_targets[i].H)
+                R = self.predicted_targets[i].R if R is None else block_diag(R, self.predicted_targets[i].R)
 
-            H = self.predicted_targets[i].H
-            cov = self.predicted_targets[i].state_cov
-            predicted_state = self.predicted_targets[i].state
+        H = H[~np.all(H == 0, axis=1)]
 
-            G = self.predicted_targets[i].B
-            T = np.concatenate((G, orth(G)), axis=1)
-            T = np.linalg.inv(T + np.ones(T.shape) * 0.0001)
-            x = np.concatenate((np.zeros((2, 2)), np.eye(2)), axis=1)
-            L = np.dot(x, T)
+        T = np.concatenate((G, orth(G)), axis=1)
+        T = np.linalg.inv(T + np.random.random(T.shape) * 0.0001)
+        p = len(measurements) * 2
+        n = self.full_state_prediction.shape[0]
+        x = np.concatenate((np.zeros((p, p)), np.eye(n - p)), axis=1)
 
-            new_cov = self.gamma * np.dot(H.T, np.dot(np.linalg.inv(R), H)) + \
-                      np.dot(L.T, np.dot(np.linalg.inv(np.dot(L, np.dot(cov, L.T))), L))
+        L = np.dot(x, T)
 
-            IM = np.dot(H, predicted_state)
-            K = np.dot(cov, np.dot(H.T, np.linalg.inv(R)))
+        new_cov = self.gamma * np.dot(H.T, np.dot(np.linalg.inv(R), H)) + \
+                  np.dot(L.T, np.dot(np.linalg.inv(np.dot(L, np.dot(self.full_cov_prediction, L.T))), L))
 
-            new_state = predicted_state + self.gamma * np.dot(K, (measurement - IM))
+        IM = np.dot(H, self.full_state_prediction)
+        K = np.dot(new_cov, np.dot(H.T, np.linalg.inv(R)))
 
-            updated_targets.append(Target(init_state=new_state,
-                                          init_cov=new_cov))
+        new_state = self.full_state_prediction + self.gamma * np.dot(K, (all_measurements - IM))
+
+        self.full_cov_update = new_cov
+        self.full_state_update = new_state
+
+        updated_targets = self.predicted_targets
+        for i, u in enumerate(updated_targets):
+            t_state = new_state[i*4: (i*4)+4, i*4: (i*4)+4]
+            t_cov = new_cov[i*4: (i*4)+4, i*4: (i*4)+4]
+            u.set_state_cov(t_state, t_cov)
 
         self.measurements = measurements
         self.updated_targets = updated_targets
@@ -122,6 +182,7 @@ class DKFNode:
 
         return x_out_of_bounds or y_out_of_bounds
 
+    # TODO: get rid off, steps will be facilitated by network
     def step_through(self, measurements, measurement_id=0):
         if not isinstance(measurements, dict):
             self.predict()
