@@ -24,7 +24,8 @@ class FilterNodeTests(TestCase):
         self.target2 = Target()
 
         self.node0 = DKFNode(1, [deepcopy(self.target1),
-                                 deepcopy(self.target2)])
+                                 deepcopy(self.target2),
+                                 ])
 
     def tearDown(self):
         super().tearDown()
@@ -51,10 +52,6 @@ class FilterNodeTests(TestCase):
 
         assert_array_equal(node0_target_new_pos, node0_pred_pos)
 
-        print(node0_pred_full_state)
-        print(node0_target_curr_pos)
-        print(node0_target_new_pos)
-
     def test_02_update(self):
         print('update')
 
@@ -67,6 +64,30 @@ class FilterNodeTests(TestCase):
 
         self.node0.update([np.array([[1.01], [1.01], [1.01], [1.01]]),
                            np.array([[1.01], [1.01], [1.01], [1.01]])])
+        node0_update_full_state = self.node0.full_state_update
+        node0_update_full_cov = self.node0.full_cov_update
+        node0_target_update_pos = self.node0.updated_targets[0].state
+
+        assert_raises(AssertionError, assert_array_equal,
+                      node0_target_new_pos, node0_target_update_pos)
+
+        assert_raises(AssertionError, assert_array_equal,
+                      node0_pred_full_state, node0_update_full_state)
+        assert_raises(AssertionError, assert_array_equal,
+                      node0_pred_full_cov, node0_update_full_cov)
+
+    def test_03_update_missing_measurement(self):
+        print('update, missing measurement')
+
+        inputs = [np.array([[1], [1]]), np.array([[1], [1]])]
+
+        self.node0.predict(inputs)
+        node0_pred_full_state = self.node0.full_state_prediction
+        node0_pred_full_cov = self.node0.full_cov_prediction
+        node0_target_new_pos = self.node0.predicted_targets[0].state
+
+        self.node0.update([np.array([[1.01], [1.01], [1.01], [1.01]]),
+                           None])
         node0_update_full_state = self.node0.full_state_update
         node0_update_full_cov = self.node0.full_cov_update
         node0_target_update_pos = self.node0.updated_targets[0].state

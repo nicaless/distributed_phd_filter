@@ -43,6 +43,10 @@ class DKFNode:
         self.measurements = []
         self.updated_targets = []
 
+        # Consensus Filter Operators
+        self.omega = None
+        self.q = None
+
         # TRACKERS
         self.observations = {}
         self.node_positions = {}
@@ -53,6 +57,9 @@ class DKFNode:
         self.consensus_positions = {}
         self.consensus_target_covs = {}
 
+    def update_targets(self, targets):
+        self.targets = targets
+
     def update_position(self, new_position):
         self.position = new_position
         x = new_position[0]
@@ -60,7 +67,6 @@ class DKFNode:
         self.region = [(x - self.fov, x + self.fov),
                        (y - self.fov, y + self.fov)]
 
-    # TODO: Revise so thate states/cov is block diag of all targets
     def predict(self, inputs=None):
         """
         Makes prediction for all targets
@@ -131,7 +137,8 @@ class DKFNode:
             G = self.predicted_targets[i].B if G is None else block_diag(G, self.predicted_targets[i].B)
 
             if self.check_measure_oob(m) or \
-                            np.random.rand() > self.detection_probability:
+                            np.random.rand() > self.detection_probability or \
+                            m is None:
                 H = np.zeros(self.predicted_targets[i].H.shape) if H is None else \
                     block_diag(H, np.zeros(self.predicted_targets[i].H.shape))
                 continue
@@ -182,19 +189,28 @@ class DKFNode:
 
         return x_out_of_bounds or y_out_of_bounds
 
-    # TODO: get rid off, steps will be facilitated by network
-    def step_through(self, measurements, measurement_id=0):
-        if not isinstance(measurements, dict):
-            self.predict()
-            self.update(measurements)
-            self.targets = self.updated_targets
-            self.update_trackers(measurement_id)
-        else:
-            for i, m in measurements.items():
-                self.predict()
-                self.update(m)
-                self.targets = self.updated_targets
-                self.update_trackers(i)
+    def init_consensus(self):
+        self.omega = np.linalg.inv(self.full_cov_update)
+        self.qs = np.dot(np.linalg.inv(self.full_cov_update,
+                                       self.full_state_update))
+
+    def consensus_filter(self, neighbor_omegas, neighbor_qs, neighbor_weights):
+        sum_omega = self.omega
+        assert len(neighbor_omegas) == len(neighbor_qs) == len(neighbor_weights)
+        for i in range(len(neighbor_omegas)):
+            sum_omega += np.dot(neighbor_weights[i], neighbor_omegas)
+
+        sum_qs = self.qs
+        for i in range(len(neighbor_omegas)):
+            sum_qs += sum_qs + np.dot(neighbor_weights[i],
+                                      neighbor_qs[i])
+
+        self.omega = sum_omega
+        self.qs = sum_qs
+
+    def after_consensus_update(self):
+        self.full_state = np.dot(np.linalg.inv(self.omega), self.qs)
+        self.full_cov = np.linalg.inv(self.omega)
 
     def update_trackers(self, i, pre_consensus=True):
         if pre_consensus:
@@ -206,29 +222,6 @@ class DKFNode:
         else:
             self.consensus_positions[i] = [t.state for t in self.targets]
             self.consensus_target_covs[i] = [t.state_cov for t in self.targets]
-
-    @staticmethod
-    def get_mahalanobis(target1, target2):
-        d = mahalanobis(target1.state, target2.state,
-                        np.linalg.inv(target1.state_cov))
-        return d
-
-@njit
-def dmvnorm(state, cov, obs):
-    """
-    Evaluate a multivariate normal, given a state (vector) and covariance (matrix) and a position x (vector) at which to evaluate"
-    :param state:
-    :param cov:
-    :param obs:
-    :return:
-    """
-    k = state.shape[0]
-    part1 = (2.0 * np.pi) ** (-k * 0.5)
-    part2 = np.power(np.linalg.det(cov), -0.5)
-    dist = obs - state
-    part3 = np.exp(-0.5 * np.dot(np.dot(dist.T, np.linalg.inv(cov)), dist))
-    return part1 * part2 * part3
-
 
 
 
