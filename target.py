@@ -1,8 +1,8 @@
 import numpy as np
 
 
-dt_1 = 0
-dt_2 = 0
+dt_1 = 1
+dt_2 = 1
 DEFAULT_INIT_STATE = np.array([[0.0], [0.0], [0.0], [0.0]])
 DEFAULT_INIT_COV = np.diag((0.01, 0.01, 0.01, 0.01))
 DEFAULT_A = np.array([[1, 0, dt_1, 0],
@@ -32,7 +32,7 @@ class Target:
 
         self.A = A
         self.B = B
-        self.U = np.zeros(B.shape[1])
+        self.U = np.zeros((B.shape[1], 1))
 
         self.Q = np.eye(init_state.shape[0])
 

@@ -45,7 +45,7 @@ class DKFNode:
 
         # Consensus Filter Operators
         self.omega = None
-        self.q = None
+        self.qs = None
 
         # TRACKERS
         self.observations = {}
@@ -67,10 +67,9 @@ class DKFNode:
         self.region = [(x - self.fov, x + self.fov),
                        (y - self.fov, y + self.fov)]
 
-    def predict(self, inputs=None):
+    def predict(self):
         """
         Makes prediction for all targets
-        :param input: array of all inputs
         :return:
         """
         # Existing Targets
@@ -79,7 +78,6 @@ class DKFNode:
         # Set R for All Targets then get measurement and create new full state array
         all_states = None
         all_covs = None
-        all_inputs = None
         predicted_pos = []
         for p in range(len(all_targets)):
             all_states = all_targets[p].state if all_states is None else \
@@ -88,10 +86,7 @@ class DKFNode:
             all_covs = all_targets[p].state_cov if all_covs is None else \
                 block_diag(all_covs, all_targets[p].state_cov)
 
-            U = inputs[p] if inputs[p] is not None else np.zeros(all_targets[p].B.shape[1])
-            all_inputs = U if all_inputs is None else np.concatenate((all_inputs, U))
-
-            all_targets[p].next_state(input=inputs[p])
+            all_targets[p].next_state()
             predicted_pos.append(all_targets[p].state)
 
         self.predicted_pos = predicted_pos
@@ -105,7 +100,7 @@ class DKFNode:
             B = p.B if B is None else block_diag(B, p.B)
 
         # Predict Full State
-        full_prediction = np.dot(A, all_states) + np.dot(B, all_inputs)
+        full_prediction = np.dot(A, all_states)
         Q = np.eye(all_states.shape[0])  # no noise
         full_cov = np.dot(A, np.dot(all_covs, A.T)) + Q
 
@@ -170,7 +165,7 @@ class DKFNode:
 
         updated_targets = self.predicted_targets
         for i, u in enumerate(updated_targets):
-            t_state = new_state[i*4: (i*4)+4, i*4: (i*4)+4]
+            t_state = new_state[i*4: (i*4)+4]
             t_cov = new_cov[i*4: (i*4)+4, i*4: (i*4)+4]
             u.set_state_cov(t_state, t_cov)
 
@@ -191,19 +186,18 @@ class DKFNode:
 
     def init_consensus(self):
         self.omega = np.linalg.inv(self.full_cov_update)
-        self.qs = np.dot(np.linalg.inv(self.full_cov_update,
-                                       self.full_state_update))
+        self.qs = np.dot(np.linalg.inv(self.full_cov_update),
+                         self.full_state_update)
 
     def consensus_filter(self, neighbor_omegas, neighbor_qs, neighbor_weights):
         sum_omega = self.omega
         assert len(neighbor_omegas) == len(neighbor_qs) == len(neighbor_weights)
         for i in range(len(neighbor_omegas)):
-            sum_omega += np.dot(neighbor_weights[i], neighbor_omegas)
+            sum_omega += np.dot(neighbor_weights[i], neighbor_omegas[i])
 
         sum_qs = self.qs
         for i in range(len(neighbor_omegas)):
-            sum_qs += sum_qs + np.dot(neighbor_weights[i],
-                                      neighbor_qs[i])
+            sum_qs += np.dot(neighbor_weights[i], neighbor_qs[i])
 
         self.omega = sum_omega
         self.qs = sum_qs
@@ -211,6 +205,14 @@ class DKFNode:
     def after_consensus_update(self):
         self.full_state = np.dot(np.linalg.inv(self.omega), self.qs)
         self.full_cov = np.linalg.inv(self.omega)
+
+        after_consensus_targets = self.updated_targets
+        for i, u in enumerate(after_consensus_targets):
+            t_state = deepcopy(self.full_state[i * 4: (i * 4) + 4])
+            t_cov = deepcopy(self.full_cov[i * 4: (i * 4) + 4,
+                             i * 4: (i * 4) + 4])
+            u.set_state_cov(t_state, t_cov)
+        self.targets = after_consensus_targets
 
     def update_trackers(self, i, pre_consensus=True):
         if pre_consensus:

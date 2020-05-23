@@ -45,8 +45,7 @@ class DKFNetwork:
     """
     Simulation Operations
     """
-    def step_through(self, inputs,
-                     L=3, opt='agent',
+    def step_through(self, inputs, L=3,
                      fail_int=None, fail_sequence=None,
                      single_node_fail=False,
                      base=False, noise_mult=1):
@@ -67,13 +66,14 @@ class DKFNetwork:
             """
             True Target Update With Inputs
             """
-            # TODO:
+            for t, target in enumerate(self.targets):
+                target.next_state(ins[t])
 
             """
             Local Target Estimation
             """
             for id, n in nodes.items():
-                n.predict(inputs=ins)
+                n.predict()
                 measurements = n.get_measurements()
                 n.update(measurements)
                 n.update_trackers(i)
@@ -122,32 +122,32 @@ class DKFNetwork:
                     weights = []
                     omegas = []
                     qs = []
+                    n_weights = nx.get_node_attributes(self.network,
+                                                      'weights')[id]
                     for neighbor in self.network.neighbors(id):
-                        n_weight = nx.get_node_attributes(self.network,
-                                                          'weights')[neighbor]
                         n_node = nx.get_node_attributes(self.network,
                                                         'node')[neighbor]
-                        weights.append(n_weight)
+                        weights.append(n_weights[neighbor])
                         omegas.append(n_node.omega)
                         qs.append(n_node.qs)
-                    neighbor_weights[n] = weights
-                    neighbor_omegas[n] = omegas
-                    neighbor_qs[n] = qs
+                    neighbor_weights[id] = weights
+                    neighbor_omegas[id] = omegas
+                    neighbor_qs[id] = qs
 
                 for id, n in nodes.items():
-                    n.consensus_filter(neighbor_weights[n],
-                                       neighbor_omegas[n],
-                                       neighbor_qs[n])
+                    n.consensus_filter(neighbor_omegas[id],
+                                       neighbor_qs[id],
+                                       neighbor_weights[id],)
             for id, n in nodes.items():
                 n.after_consensus_update()
 
             for id, n in nodes.items():
                 n.update_trackers(i, pre_consensus=False)
 
-            trace_covs = self.get_trace_covariances()
-            self.max_trace_cov[i] = max(trace_covs)
-            self.mean_trace_cov[i] = np.mean(trace_covs)
-            self.errors[i] = self.calc_errors(self.targets)
+            # trace_covs = self.get_trace_covariances()
+            # self.max_trace_cov[i] = max(trace_covs)
+            # self.mean_trace_cov[i] = np.mean(trace_covs)
+            # self.errors[i] = self.calc_errors(self.targets)
             self.adjacencies[i] = self.adjacency_matrix()
             self.weighted_adjacencies[i] = self.weighted_adjacency_matrix()
 
