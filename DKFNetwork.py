@@ -31,7 +31,7 @@ class DKFNetwork:
         self.network = G
         nx.set_node_attributes(self.network, nodes, 'node')
         nx.set_node_attributes(self.network, weights, 'weights')
-        self.targets = targets
+        self.targets = targets  # the true targets
 
         # TRACKERS
         self.failures = {}
@@ -45,8 +45,8 @@ class DKFNetwork:
     """
     Simulation Operations
     """
-    def step_through(self, inputs, L=3,
-                     fail_int=None, fail_sequence=None,
+    def step_through(self, inputs, measurements,
+                     L=3, fail_int=None, fail_sequence=None,
                      single_node_fail=False,
                      base=False, noise_mult=1):
         nodes = nx.get_node_attributes(self.network, 'node')
@@ -67,15 +67,15 @@ class DKFNetwork:
             True Target Update With Inputs
             """
             for t, target in enumerate(self.targets):
-                target.next_state(ins[t])
+                target.next_state(input=ins[t])
+                print(target.state)
 
             """
             Local Target Estimation
             """
             for id, n in nodes.items():
                 n.predict()
-                measurements = n.get_measurements()
-                n.update(measurements)
+                n.update(measurements[i])
                 n.update_trackers(i)
 
 
@@ -144,10 +144,10 @@ class DKFNetwork:
             for id, n in nodes.items():
                 n.update_trackers(i, pre_consensus=False)
 
-            # trace_covs = self.get_trace_covariances()
-            # self.max_trace_cov[i] = max(trace_covs)
-            # self.mean_trace_cov[i] = np.mean(trace_covs)
-            # self.errors[i] = self.calc_errors(self.targets)
+            trace_covs = self.get_trace_covariances()
+            self.max_trace_cov[i] = max(trace_covs)
+            self.mean_trace_cov[i] = np.mean(trace_covs)
+            self.errors[i] = self.calc_errors(self.targets)
             self.adjacencies[i] = self.adjacency_matrix()
             self.weighted_adjacencies[i] = self.weighted_adjacency_matrix()
 
@@ -371,72 +371,38 @@ class DKFNetwork:
     """
 
     def get_trace_covariances(self):
-        min_cardinality_index = min(self.cardinality.keys(),
-                                    key=(lambda k: self.cardinality[k]))
-        min_cardinality = self.cardinality[min_cardinality_index]
+        nodes = nx.get_node_attributes(self.network, 'node')
 
         cov_data = []
-        for node_id in list(self.network.nodes()):
-            P = self.construct_blockdiag_cov(node_id, min_cardinality)
-            cov_data.append(np.trace(P))
+        for id, node in nodes.items():
+            cov_data.append(np.trace(node.full_cov))
 
         return cov_data
 
     def calc_errors(self, true_targets):
         nodes = nx.get_node_attributes(self.network, 'node')
 
-        max_errors = []
-        for i, t in enumerate(true_targets):
+        node_errors = {}
+        for id, node in nodes.items():
             errors = []
-            for n, node in nodes.items():
-                if not node.check_measure_oob(t) and len(node.targets) > 0:
-                    distances = [math.hypot(t[0] - comp.state[0][0],
-                                            t[1] - comp.state[1][0])
-                                 for comp in node.targets]
-                    errors.append(min(distances))
-            if len(errors) == 0:
-                max_errors.append(0)
-            else:
-                max_errors.append(max(errors))
-        return np.max(max_errors)
+            for i, t in enumerate(true_targets):
+                e = mahalanobis(node.targets[i].state,
+                                t.state,
+                                node.targets[i].state_cov)
+                errors.append(e)
+            node_errors[id] = errors
 
-    def calc_ospa(self, true_targets):
-        tracks = []
-        nodes = nx.get_node_attributes(self.network, 'node')
-
-        for n, node in nodes.items():
-            for t in node.targets:
-                tracks.append(np.array([[t.state[0][0]],
-                                        [t.state[1][0]]]))
-
-        gospa, \
-        target_to_track_assigments, \
-        gospa_localization, \
-        gospa_missed, \
-        gospa_false = calculate_gospa(true_targets, tracks)
-
-        return gospa
-
-    def calc_nmse_card(self, true_targets):
-        N = len(true_targets)
-        squared_error = 0
-        sum_card = 0
-
-        for n, card in self.cardinality.items():
-            squared_error += (card - N) ** 2
-            sum_card += card
-
-        return squared_error / (N * sum_card)
+        return node_errors
 
 
     """
     Saving Data
     """
-
     def save_metrics(self, path):
         # Save Errors
         errors = pd.DataFrame.from_dict(self.errors, orient='index')
-        errors.columns = ['value']
+        for i in range(len(self.network.nodes)):
+            errors[i] = errors[i].apply(np.nanmean)
         errors.to_csv(path + '/errors.csv', index_label='time')
 
         # Save Max Trace Cov
@@ -448,16 +414,6 @@ class DKFNetwork:
         mean_tr_cov = pd.DataFrame.from_dict(self.mean_trace_cov, orient='index')
         mean_tr_cov.columns = ['value']
         mean_tr_cov.to_csv(path + '/mean_tr_cov.csv', index_label='time')
-
-        # Save OSPA
-        ospa = pd.DataFrame.from_dict(self.gospa, orient='index')
-        ospa.columns = ['value']
-        ospa.to_csv(path + '/ospa.csv', index_label='time')
-
-        # Save NMSE
-        nmse = pd.DataFrame.from_dict(self.nmse_card, orient='index')
-        nmse.columns = ['value']
-        nmse.to_csv(path + '/nmse.csv', index_label='time')
 
     def save_estimates(self, path):
         all_nodes = nx.get_node_attributes(self.network, 'node')

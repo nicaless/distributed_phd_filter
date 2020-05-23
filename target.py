@@ -1,9 +1,9 @@
 import numpy as np
 
 
-dt_1 = 1
-dt_2 = 1
-DEFAULT_INIT_STATE = np.array([[0.0], [0.0], [0.0], [0.0]])
+dt_1 = 1.
+dt_2 = 1.
+DEFAULT_INIT_STATE = np.array([[0.0], [0.0], [dt_1], [dt_2]])
 DEFAULT_INIT_COV = np.diag((0.01, 0.01, 0.01, 0.01))
 DEFAULT_A = np.array([[1, 0, dt_1, 0],
                       [0, 1, 0, dt_2],
