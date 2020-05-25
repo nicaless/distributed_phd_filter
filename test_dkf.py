@@ -118,7 +118,7 @@ class FilterNodeTests(TestCase):
         assert_raises(AssertionError, assert_array_equal,
                       node0_pred_full_cov, node0_update_full_cov)
 
-    def test_init_consensus(self):
+    def test_04_init_consensus(self):
         print('init consensus')
         self.node0.predict()
         self.node1.predict()
@@ -141,7 +141,7 @@ class FilterNodeTests(TestCase):
         assert_raises(AssertionError, assert_array_equal,
                       self.node0.qs, self.node1.qs)
 
-    def test_consensus_filter(self):
+    def test_05_consensus_filter(self):
         print('consensus filter')
         self.node0.predict()
         self.node1.predict()
@@ -165,7 +165,7 @@ class FilterNodeTests(TestCase):
         assert_raises(AssertionError, assert_array_equal,
                       prev_qs, self.node0.qs)
 
-    def test_after_consensus_update(self):
+    def test_06_after_consensus_update(self):
         print('after consensus update')
 
         self.node0.predict()
@@ -192,56 +192,207 @@ class FilterNodeTests(TestCase):
         assert_raises(AssertionError, assert_array_equal,
                       old_cov, self.node0.full_cov)
 
-    def test_step(self):
+    def test_07_step(self):
         print('step')
 
         inputs = {0: [np.array([[1], [1]]),
                       np.array([[1], [1]])],
-                  1: [np.array([[1], [1]]),
-                      np.array([[1], [1]])]
+                  1: [np.array([[0], [0]]),
+                      np.array([[0], [0]])],
+                  2: [np.array([[-1], [-1]]),
+                      np.array([[-1], [-1]])]
                   }
-        measurements = {0: [np.array([[1.01], [1.01], [1.01], [1.01]]),
-                           np.array([[1.01], [1.01], [1.01], [1.01]])],
-                       1: [np.array([[1.01], [1.01], [1.01], [1.01]]),
-                           np.array([[1.01], [1.01], [1.01], [1.01]])]
-                       }
+        measurements = {0: [np.array([[1.01], [1.01], [2.01], [2.01]]),
+                            np.array([[1.01], [1.01], [2.01], [2.01]])],
+                        1: [np.array([[3.01], [3.01], [2.01], [2.01]]),
+                            np.array([[3.01], [3.01], [2.01], [2.01]])],
+                        2: [np.array([[5.01], [5.01], [1.01], [1.01]]),
+                            np.array([[5.01], [5.01], [1.01], [1.01]])]
+                        }
         self.network.step_through(inputs, measurements=measurements)
 
         assert len(self.network.adjacencies) == len(inputs)
         assert len(self.network.errors) == len(inputs)
         assert len(self.network.mean_trace_cov) == len(inputs)
 
-    def test_save_metrics(self):
+    def test_08_save_metrics(self):
         print('save metrics')
 
         inputs = {0: [np.array([[1], [1]]),
                       np.array([[1], [1]])],
                   1: [np.array([[0], [0]]),
-                      np.array([[0], [0]])]
+                      np.array([[0], [0]])],
+                  2: [np.array([[-1], [-1]]),
+                      np.array([[-1], [-1]])]
                   }
         measurements = {0: [np.array([[1.01], [1.01], [2.01], [2.01]]),
-                           np.array([[1.01], [1.01], [2.01], [2.01]])],
-                       1: [np.array([[3.01], [3.01], [2.01], [2.01]]),
-                           np.array([[3.01], [3.01], [2.01], [2.01]])]
-                       }
-
+                            np.array([[1.01], [1.01], [2.01], [2.01]])],
+                        1: [np.array([[3.01], [3.01], [2.01], [2.01]]),
+                            np.array([[3.01], [3.01], [2.01], [2.01]])],
+                        2: [np.array([[5.01], [5.01], [1.01], [1.01]]),
+                            np.array([[5.01], [5.01], [1.01], [1.01]])]
+                        }
         self.network.step_through(inputs, measurements=measurements)
         self.network.save_metrics('~')
 
-    def test_save_estimates(self):
+    def test_09_save_estimates(self):
         print('save estimates')
 
         inputs = {0: [np.array([[1], [1]]),
                       np.array([[1], [1]])],
-                  1: [np.array([[1], [1]]),
-                      np.array([[1], [1]])]
+                  1: [np.array([[0], [0]]),
+                      np.array([[0], [0]])],
+                  2: [np.array([[-1], [-1]]),
+                      np.array([[-1], [-1]])]
                   }
-        measurements = {0: [np.array([[1.01], [1.01], [1.01], [1.01]]),
-                           np.array([[1.01], [1.01], [1.01], [1.01]])],
-                       1: [np.array([[2.01], [2.01], [2.01], [2.01]]),
-                           np.array([[2.01], [2.01], [2.01], [2.01]])]
-                       }
+        measurements = {0: [np.array([[1.01], [1.01], [2.01], [2.01]]),
+                            np.array([[1.01], [1.01], [2.01], [2.01]])],
+                        1: [np.array([[3.01], [3.01], [2.01], [2.01]]),
+                            np.array([[3.01], [3.01], [2.01], [2.01]])],
+                        2: [np.array([[5.01], [5.01], [1.01], [1.01]]),
+                            np.array([[5.01], [5.01], [1.01], [1.01]])]
+                        }
         self.network.step_through(inputs, measurements=measurements)
         self.network.save_estimates('~')
+
+    def test_10_step_with_failure_agent(self):
+        print('step with failure - agent')
+
+        inputs = {0: [np.array([[1], [1]]),
+                      np.array([[1], [1]])],
+                  1: [np.array([[0], [0]]),
+                      np.array([[0], [0]])],
+                  2: [np.array([[-1], [-1]]),
+                      np.array([[-1], [-1]])],
+                  3: [np.array([[1], [1]]),
+                      np.array([[1], [1]])],
+                  4: [np.array([[0], [0]]),
+                      np.array([[0], [0]])],
+                  5: [np.array([[-1], [-1]]),
+                      np.array([[-1], [-1]])]
+                  }
+        measurements = {0: [np.array([[1.01], [1.01], [2.01], [2.01]]),
+                            np.array([[1.01], [1.01], [2.01], [2.01]])],
+                        1: [np.array([[3.01], [3.01], [2.01], [2.01]]),
+                            np.array([[3.01], [3.01], [2.01], [2.01]])],
+                        2: [np.array([[5.01], [5.01], [1.01], [1.01]]),
+                            np.array([[5.01], [5.01], [1.01], [1.01]])]
+                        }
+        self.network.step_through(inputs, measurements=measurements, fail_int=[1])
+        self.network.save_metrics('~')
+        self.network.save_estimates('~')
+
+        assert len(self.network.adjacencies) == len(inputs)
+        assert len(self.network.errors) == len(inputs)
+        assert len(self.network.mean_trace_cov) == len(inputs)
+
+    def test_11_step_with_failure_team(self):
+        print('step with failure - team')
+
+        inputs = {0: [np.array([[1], [1]]),
+                      np.array([[1], [1]])],
+                  1: [np.array([[0], [0]]),
+                      np.array([[0], [0]])],
+                  2: [np.array([[-1], [-1]]),
+                      np.array([[-1], [-1]])],
+                  3: [np.array([[1], [1]]),
+                      np.array([[1], [1]])],
+                  4: [np.array([[0], [0]]),
+                      np.array([[0], [0]])],
+                  5: [np.array([[-1], [-1]]),
+                      np.array([[-1], [-1]])]
+                  }
+        measurements = {0: [np.array([[1.01], [1.01], [2.01], [2.01]]),
+                            np.array([[1.01], [1.01], [2.01], [2.01]])],
+                        1: [np.array([[3.01], [3.01], [2.01], [2.01]]),
+                            np.array([[3.01], [3.01], [2.01], [2.01]])],
+                        2: [np.array([[5.01], [5.01], [1.01], [1.01]]),
+                            np.array([[5.01], [5.01], [1.01], [1.01]])]
+                        }
+        self.network.step_through(inputs, measurements=measurements,
+                                  opt='team', fail_int=[1])
+
+        assert len(self.network.adjacencies) == len(inputs)
+        assert len(self.network.errors) == len(inputs)
+        assert len(self.network.mean_trace_cov) == len(inputs)
+
+    def test_12_step_with_failure_greedy(self):
+        print('step with failure - greedy')
+
+        inputs = {0: [np.array([[1], [1]]),
+                      np.array([[1], [1]])],
+                  1: [np.array([[0], [0]]),
+                      np.array([[0], [0]])],
+                  2: [np.array([[-1], [-1]]),
+                      np.array([[-1], [-1]])],
+                  3: [np.array([[1], [1]]),
+                      np.array([[1], [1]])],
+                  4: [np.array([[0], [0]]),
+                      np.array([[0], [0]])],
+                  5: [np.array([[-1], [-1]]),
+                      np.array([[-1], [-1]])]
+                  }
+        measurements = {0: [np.array([[1.01], [1.01], [2.01], [2.01]]),
+                            np.array([[1.01], [1.01], [2.01], [2.01]])],
+                        1: [np.array([[3.01], [3.01], [2.01], [2.01]]),
+                            np.array([[3.01], [3.01], [2.01], [2.01]])],
+                        2: [np.array([[5.01], [5.01], [1.01], [1.01]]),
+                            np.array([[5.01], [5.01], [1.01], [1.01]])]
+                        }
+        self.network.step_through(inputs, measurements=measurements,
+                                  opt='greedy', fail_int=[1])
+
+        assert len(self.network.adjacencies) == len(inputs)
+        assert len(self.network.errors) == len(inputs)
+        assert len(self.network.mean_trace_cov) == len(inputs)
+
+    def test_13_step_with_failure_random(self):
+        print('step with failure - random')
+
+        inputs = {0: [np.array([[1], [1]]),
+                      np.array([[1], [1]])],
+                  1: [np.array([[0], [0]]),
+                      np.array([[0], [0]])],
+                  2: [np.array([[-1], [-1]]),
+                      np.array([[-1], [-1]])],
+                  3: [np.array([[1], [1]]),
+                      np.array([[1], [1]])],
+                  4: [np.array([[0], [0]]),
+                      np.array([[0], [0]])],
+                  5: [np.array([[-1], [-1]]),
+                      np.array([[-1], [-1]])]
+                  }
+        measurements = {0: [np.array([[1.01], [1.01], [2.01], [2.01]]),
+                            np.array([[1.01], [1.01], [2.01], [2.01]])],
+                        1: [np.array([[3.01], [3.01], [2.01], [2.01]]),
+                            np.array([[3.01], [3.01], [2.01], [2.01]])],
+                        2: [np.array([[5.01], [5.01], [1.01], [1.01]]),
+                            np.array([[5.01], [5.01], [1.01], [1.01]])]
+                        }
+        self.network.step_through(inputs, measurements=measurements,
+                                  opt='random', fail_int=[1])
+
+        assert len(self.network.adjacencies) == len(inputs)
+        assert len(self.network.errors) == len(inputs)
+        assert len(self.network.mean_trace_cov) == len(inputs)
+
+    def test_14_save_target_states(self):
+        print('save target_states')
+
+        inputs = {0: [np.array([[1], [1]]),
+                      np.array([[1], [1]])],
+                  1: [np.array([[0], [0]]),
+                      np.array([[0], [0]])],
+                  2: [np.array([[-1], [-1]]),
+                      np.array([[-1], [-1]])],
+                  3: [np.array([[1], [1]]),
+                      np.array([[1], [1]])],
+                  4: [np.array([[0], [0]]),
+                      np.array([[0], [0]])],
+                  5: [np.array([[-1], [-1]]),
+                      np.array([[-1], [-1]])]
+                  }
+        self.network.step_through(inputs)
+        self.network.save_true_target_states('~')
 
 

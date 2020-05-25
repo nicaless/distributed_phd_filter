@@ -107,9 +107,9 @@ class DKFNode:
         self.full_state_prediction = full_prediction
         self.full_cov_prediction = full_cov
 
-    def get_measurements(self):
+    def get_measurements(self, targets):
         measurements = []
-        for p in self.predicted_targets:
+        for p in targets:
             new_meas = p.get_measurement(R=self.R)
             measurements.append(new_meas)
         return measurements
@@ -142,23 +142,30 @@ class DKFNode:
                 H = self.predicted_targets[i].H if H is None else block_diag(H, self.predicted_targets[i].H)
                 R = self.predicted_targets[i].R if R is None else block_diag(R, self.predicted_targets[i].R)
 
+        Hshape = H.shape
+        # TODO is this the right contingency plan?
         H = H[~np.all(H == 0, axis=1)]
+        if len(H) == 0:
+            print("{n} made no observations".format(n=self.node_id))
+            new_cov = self.full_cov_prediction
+            new_state = self.full_state_prediction
+        else:
+            T = np.concatenate((G, orth(G)), axis=1)
+            T = np.linalg.inv(T + np.random.random(T.shape) * 0.0001)
+            p = len(measurements) * 2
+            n = self.full_state_prediction.shape[0]
+            x = np.concatenate((np.zeros((p, p)), np.eye(n - p)), axis=1)
 
-        T = np.concatenate((G, orth(G)), axis=1)
-        T = np.linalg.inv(T + np.random.random(T.shape) * 0.0001)
-        p = len(measurements) * 2
-        n = self.full_state_prediction.shape[0]
-        x = np.concatenate((np.zeros((p, p)), np.eye(n - p)), axis=1)
+            L = np.dot(x, T)
 
-        L = np.dot(x, T)
+            new_cov = self.gamma * np.dot(H.T, np.dot(np.linalg.inv(R), H)) + \
+                      np.dot(L.T, np.dot(np.linalg.inv(np.dot(L, np.dot(self.full_cov_prediction, L.T))), L))
+            new_cov = np.linalg.pinv(new_cov)
 
-        new_cov = self.gamma * np.dot(H.T, np.dot(np.linalg.inv(R), H)) + \
-                  np.dot(L.T, np.dot(np.linalg.inv(np.dot(L, np.dot(self.full_cov_prediction, L.T))), L))
+            IM = np.dot(H, self.full_state_prediction)
+            K = np.dot(new_cov, np.dot(H.T, np.linalg.inv(R)))
 
-        IM = np.dot(H, self.full_state_prediction)
-        K = np.dot(new_cov, np.dot(H.T, np.linalg.inv(R)))
-
-        new_state = self.full_state_prediction + self.gamma * np.dot(K, (all_measurements - IM))
+            new_state = self.full_state_prediction + self.gamma * np.dot(K, (all_measurements - IM))
 
         self.full_cov_update = new_cov
         self.full_state_update = new_state
@@ -185,9 +192,9 @@ class DKFNode:
         return x_out_of_bounds or y_out_of_bounds
 
     def init_consensus(self):
-        self.omega = np.linalg.inv(self.full_cov_update)
-        self.qs = np.dot(np.linalg.inv(self.full_cov_update),
-                         self.full_state_update)
+        fuzz = np.random.random(self.full_cov_update.shape) * 0.0001
+        self.omega = np.linalg.inv(fuzz)
+        self.qs = np.dot(np.linalg.inv(fuzz), self.full_state_update)
 
     def consensus_filter(self, neighbor_omegas, neighbor_qs, neighbor_weights):
         sum_omega = self.omega

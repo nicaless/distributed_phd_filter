@@ -11,16 +11,8 @@ from scipy.spatial.distance import mahalanobis
 from ospa import *
 from target import Target
 
-#from optimization_utils import *
-#from reconfig_utils import *
-if platform.system() == 'Linux':
-    print('loading in files with jit')
-    from optimization_utils_jit import *
-    from reconfig_utils_jit import *
-else:
-    from optimization_utils import *
-    from reconfig_utils import *
-
+from optimization_utils_dkf import *
+from reconfig_utils import *
 
 class DKFNetwork:
     def __init__(self,
@@ -37,7 +29,7 @@ class DKFNetwork:
         self.failures = {}
         self.adjacencies = {}
         self.weighted_adjacencies = {}
-        self.errors = {}  # TODO: figure out real error calculation?
+        self.errors = {}
         self.max_trace_cov = {}
         self.mean_trace_cov = {}
 
@@ -45,14 +37,16 @@ class DKFNetwork:
     """
     Simulation Operations
     """
-    def step_through(self, inputs, measurements,
-                     L=3, fail_int=None, fail_sequence=None,
+    # TODO: measurements param not needed
+    def step_through(self, inputs, measurements=None,
+                     opt='agent', L=10, fail_int=None, fail_sequence=None,
                      single_node_fail=False,
                      base=False, noise_mult=1):
         nodes = nx.get_node_attributes(self.network, 'node')
 
         failure = False
         for i, ins in inputs.items():
+            print(i)
             if fail_int is not None or fail_sequence is not None:
                 if fail_int is not None:
                     if i in fail_int:
@@ -68,44 +62,46 @@ class DKFNetwork:
             """
             for t, target in enumerate(self.targets):
                 target.next_state(input=ins[t])
-                print(target.state)
 
             """
             Local Target Estimation
             """
             for id, n in nodes.items():
                 n.predict()
-                n.update(measurements[i])
+                ms = n.get_measurements(self.targets)
+                if failure:
+                    ms = [m + np.random.random(m.shape) * noise_mult for m in ms]
+                n.update(ms)
+                # n.update(measurements[i])
                 n.update_trackers(i)
 
 
             """
             Do Optimization and Formation Synthesis
             """
-            # TODO: fix to remove geom/arithmetic fusion
-            # if failure and not base:
-            #     if opt == 'agent':
-            #         self.do_agent_opt(fail_node)
-            #     elif opt == 'team':
-            #         self.do_team_opt()
-            #     elif opt == 'greedy':
-            #         self.do_greedy_opt(fail_node)
-            #
-            #     # Random strategy
-            #     else:
-            #         self.do_random_opt(fail_node)
-            #
-            #     # Formation Synthesis
-            #     current_coords = {nid: n.position for nid, n in nodes.items()}
-            #     fov = {nid: n.fov for nid, n in nodes.items()}
-            #     centroid = self.get_centroid(fail_node)
-            #
-            #     new_coords = generate_coords(self.adjacency_matrix(),
-            #                                  current_coords, fov, centroid)
-            #     if new_coords:
-            #         for id, n in nodes.items():
-            #             n.update_position(new_coords[id])
-            #     failure = False
+            if failure and not base:
+                if opt == 'agent':
+                    self.do_agent_opt(fail_node)
+                elif opt == 'team':
+                    self.do_team_opt()
+                elif opt == 'greedy':
+                    self.do_greedy_opt(fail_node)
+
+                # Random strategy
+                else:
+                    self.do_random_opt(fail_node)
+
+                # Formation Synthesis
+                # current_coords = {nid: n.position for nid, n in nodes.items()}
+                # fov = {nid: n.fov for nid, n in nodes.items()}
+                # centroid = self.get_centroid(fail_node)
+                #
+                # new_coords = generate_coords(self.adjacency_matrix(),
+                #                              current_coords, fov, centroid)
+                # if new_coords:
+                #     for id, n in nodes.items():
+                #         n.update_position(new_coords[id])
+                failure = False
 
             """
             Consensus
@@ -142,6 +138,7 @@ class DKFNetwork:
                 n.after_consensus_update()
 
             for id, n in nodes.items():
+                print(n.full_state)
                 n.update_trackers(i, pre_consensus=False)
 
             trace_covs = self.get_trace_covariances()
@@ -181,98 +178,47 @@ class DKFNetwork:
     """
     Optimization  
     """
-    # TODO: Revisit ICRA Formula
-    def construct_blockdiag_cov(self, node_id, min_cardinality):
-        node = nx.get_node_attributes(self.network, 'node')[node_id]
-        node_comps = node.targets
-
-        if len(node_comps) == 1:
-            return node_comps[0].state_cov
-        else:
-            bd = scipy.linalg.block_diag(node_comps[0].state_cov,
-                                         node_comps[1].state_cov)
-            for i in range(2, int(np.floor(min_cardinality))):
-                bd = scipy.linalg.block_diag(bd, node_comps[i].state_cov)
-            return bd
-
-    def prep_optimization_data(self, how='geom'):
-        # get min_cardinality
-        min_cardinality_index = min(self.cardinality.keys(),
-                                    key=(lambda k: self.cardinality[k]))
-        min_cardinality = self.cardinality[min_cardinality_index]
-
-        # get the covariance data
-        cov_data = []
-        for node_id in list(self.network.nodes()):
-            P = self.construct_blockdiag_cov(node_id, min_cardinality)
-            if how == 'geom':
-                P = np.linalg.inv(P)
-            cov_data.append(P)
-
-        return min_cardinality, cov_data
-
-    def do_agent_opt(self, failed_node, how='geom'):
+    def do_agent_opt(self, failed_node):
         nodes = nx.get_node_attributes(self.network, 'node')
-
-        min_cardinality, cov_data = self.prep_optimization_data(how=how)
-
         current_weights = nx.get_node_attributes(self.network, 'weights')
+
+        cov_data = [n.full_cov for id, n in nodes.items()]
 
         covariance_data = []
         for c in cov_data:
-            det_c = np.linalg.det(c)
-            covariance_data.append((1/min_cardinality) * det_c)
+            trace_c = np.trace(c)
+            covariance_data.append(trace_c)
 
         new_config, new_weights = agent_opt(self.adjacency_matrix(),
                                             current_weights,
                                             covariance_data,
                                             failed_node=failed_node)
-        print(current_weights)
-        print(new_weights)
+
         G = nx.from_numpy_matrix(new_config)
         self.network = G
         nx.set_node_attributes(self.network, nodes, 'node')
         nx.set_node_attributes(self.network, new_weights, 'weights')
-        # G = nx.from_numpy_matrix(new_config)
-        # self.network = G
-        # nx.set_node_attributes(self.network, nodes, 'node')
-        #
-        # new_weights = self.get_metro_weights()
-        # nx.set_node_attributes(self.network, new_weights, 'weights')
 
-    def do_team_opt(self, how='geom'):
+    def do_team_opt(self):
         nodes = nx.get_node_attributes(self.network, 'node')
-
-        min_cardinality, cov_data = self.prep_optimization_data(how=how)
-
         current_weights = nx.get_node_attributes(self.network, 'weights')
 
-        # new_config, new_weights = team_opt(self.adjacency_matrix(),
-        #                                     current_weights,
-        #                                     cov_data)
+        cov_data = [n.full_cov for id, n in nodes.items()]
+
         new_config, new_weights = team_opt2(self.adjacency_matrix(),
                                             current_weights,
-                                            cov_data,
-                                            how=how)
-        print(current_weights)
-        print(new_weights)
+                                            cov_data)
         G = nx.from_numpy_matrix(new_config)
         self.network = G
         nx.set_node_attributes(self.network, nodes, 'node')
         nx.set_node_attributes(self.network, new_weights, 'weights')
-        # G = nx.from_numpy_matrix(new_config)
-        # self.network = G
-        # nx.set_node_attributes(self.network, nodes, 'node')
-        #
-        # new_weights = self.get_metro_weights()
-        # nx.set_node_attributes(self.network, new_weights, 'weights')
 
-    def do_greedy_opt(self, failed_node, how='geom'):
+    def do_greedy_opt(self, failed_node):
         nodes = nx.get_node_attributes(self.network, 'node')
 
-        min_cardinality, cov_data = self.prep_optimization_data(how=how)
-
         current_neighbors = list(self.network.neighbors(failed_node))
+
+        cov_data = [n.full_cov for id, n in nodes.items()]
 
         best_cov_id = None
         best_cov = np.inf
@@ -319,8 +265,6 @@ class DKFNetwork:
 
             new_weights = self.get_metro_weights()
             nx.set_node_attributes(self.network, new_weights, 'weights')
-
-
 
     """
     Network Operations
@@ -430,6 +374,19 @@ class DKFNetwork:
         data = data.transpose()
         data.columns = ['time', 'x', 'y']
         data.to_csv(path + '/estimates.csv', index=False)
+
+    def save_true_target_states(self, path):
+        for i, t in enumerate(self.targets):
+            x = []
+            y = []
+            for state in t.all_states:
+                x.append(state[0][0])
+                y.append(state[1][0])
+            data = pd.DataFrame([x, y])
+            data = data.transpose()
+            data.columns = ['x', 'y']
+            data.to_csv(path + '/target_{t}_positions.csv'.format(t=i),
+                        index=False)
 
     def save_positions(self, path):
         time = []
