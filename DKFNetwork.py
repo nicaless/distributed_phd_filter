@@ -67,7 +67,7 @@ class DKFNetwork:
             Local Target Estimation
             """
             for id, n in nodes.items():
-                n.predict()
+                n.predict(len(nodes))
                 ms = n.get_measurements(self.targets)
                 if failure:
                     ms = [m + np.random.random(m.shape) * noise_mult for m in ms]
@@ -135,10 +135,9 @@ class DKFNetwork:
                                        neighbor_qs[id],
                                        neighbor_weights[id],)
             for id, n in nodes.items():
-                n.after_consensus_update()
+                n.after_consensus_update(len(nodes))
 
             for id, n in nodes.items():
-                print(n.full_state)
                 n.update_trackers(i, pre_consensus=False)
 
             trace_covs = self.get_trace_covariances()
@@ -330,9 +329,10 @@ class DKFNetwork:
         for id, node in nodes.items():
             errors = []
             for i, t in enumerate(true_targets):
-                e = mahalanobis(node.targets[i].state,
-                                t.state,
-                                node.targets[i].state_cov)
+                # e = mahalanobis(node.targets[i].state,
+                #                 t.state,
+                #                 node.targets[i].state_cov)
+                e = np.linalg.norm(node.targets[i].state - t.state)
                 errors.append(e)
             node_errors[id] = errors
 
@@ -364,15 +364,17 @@ class DKFNetwork:
         time = []
         x = []
         y = []
+        ids = []
         for n, node in all_nodes.items():
             for t, pos in node.consensus_positions.items():
-                for p in pos:
+                for id, p in enumerate(pos):
                     time.append(t)
                     x.append(p[0][0])
                     y.append(p[1][0])
-        data = pd.DataFrame([time, x, y])
+                    ids.append(id)
+        data = pd.DataFrame([time, x, y, ids])
         data = data.transpose()
-        data.columns = ['time', 'x', 'y']
+        data.columns = ['time', 'x', 'y', 'target']
         data.to_csv(path + '/estimates.csv', index=False)
 
     def save_true_target_states(self, path):

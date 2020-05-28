@@ -1,5 +1,6 @@
 import argparse
 from copy import deepcopy
+import matplotlib.pyplot as plt
 import networkx as nx
 import pandas as pd
 import os
@@ -17,7 +18,7 @@ Params
 """
 parser = argparse.ArgumentParser()
 parser.add_argument('num_nodes', type=int, default=4)
-parser.add_argument('num_targets', type=int, default=3)
+parser.add_argument('num_targets', type=int, default=4)
 parser.add_argument('run_name', default='4_nodes_test')
 args = parser.parse_args()
 
@@ -29,8 +30,8 @@ fail_int = [5, 10, 15, 20]
 x_start = -50 + (100.0 / (num_nodes + 1))
 pos_start = np.array([x_start, 0, 20])
 pos_init_dist = np.floor(100.0 / (num_nodes + 1))
-fov = 100  # radius of FOV
-noise_mult = [1]
+fov = 50  # radius of FOV
+noise_mult = [1.]
 
 
 """
@@ -44,9 +45,14 @@ if not os.path.exists(run_name):
 """
 Create Targets
 """
-targets = []
-for t in range(num_targets):
-    targets.append(Target())
+t1 = Target(init_state=np.array([[25], [25], [1.], [1.]]))
+t2 = Target(init_state=np.array([[-25], [25], [1.], [1.]]))
+t3 = Target(init_state=np.array([[-25], [-25], [1.], [1.]]))
+t4 = Target(init_state=np.array([[25], [-25], [1.], [1.]]))
+targets = [t1, t2, t3, t4]
+# targets = []
+# for t in range(num_targets):
+#     targets.append(Target())
 
 
 """
@@ -152,3 +158,31 @@ for noise in range(len(noise_mult)):
         filternetwork.save_positions(trial_name)
         filternetwork.save_true_target_states(trial_name)
         filternetwork.save_topologies(trial_name + '/topologies')
+
+
+print('plot')
+# Plot Targets
+est = pd.read_csv('4_nodes_test/0_base/estimates.csv')
+# est = est[est['time'] < 17]
+colors = ['red', 'blue', 'green', 'orange']
+for t in range(num_targets):
+    df = pd.read_csv('4_nodes_test/0_base/target_{t}_positions.csv'.format(t=t))
+    # df = df.loc[0:16]
+    print(len(df))
+    plt.plot(df['x'].values, df['y'].values, '+',
+             label="True Target {t}".format(t=t), alpha=0.8, color=colors[t])
+
+    e = est[est['target'] == t]
+    e = e.groupby('time').agg({'x': 'mean', 'y': 'mean'}).reset_index()
+    print(len(e))
+    plt.plot(e['x'].values, e['y'].values, '--',
+             label="Estimate {t}".format(t=t), alpha=0.5, color=colors[t])
+
+plt.legend()
+plt.savefig('test.png')
+
+
+
+
+
+

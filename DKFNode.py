@@ -38,14 +38,19 @@ class DKFNode:
         self.predicted_targets = []
 
         # update results
-        self.full_state_update = None
         self.full_cov_update = None
+        self.blockH = None
+        self.blockR = None
+        self.blockG = None
+        self.all_measurements = None
+        self.observed_meas = None
         self.measurements = []
-        self.updated_targets = []
 
         # Consensus Filter Operators
         self.omega = None
         self.qs = None
+
+        # Consensus Update Results
 
         # TRACKERS
         self.observations = {}
@@ -67,7 +72,7 @@ class DKFNode:
         self.region = [(x - self.fov, x + self.fov),
                        (y - self.fov, y + self.fov)]
 
-    def predict(self):
+    def predict(self, N):
         """
         Makes prediction for all targets
         :return:
@@ -100,9 +105,9 @@ class DKFNode:
             B = p.B if B is None else block_diag(B, p.B)
 
         # Predict Full State
-        full_prediction = np.dot(A, all_states)
+        full_prediction = np.dot(A, all_states)  # 42d
         Q = np.eye(all_states.shape[0])  # no noise
-        full_cov = np.dot(A, np.dot(all_covs, A.T)) + Q
+        full_cov = np.dot(A, np.dot(N * all_covs, A.T)) + N * Q  # 42a
 
         self.full_state_prediction = full_prediction
         self.full_cov_prediction = full_cov
@@ -126,6 +131,7 @@ class DKFNode:
         H = None
         R = None
         G = None
+        observed_meas = None
         for i, m in enumerate(measurements):
             all_covs = self.predicted_targets[i].state_cov if all_covs is None \
                 else np.concatenate((all_covs, self.predicted_targets[i].state_cov))
@@ -136,48 +142,32 @@ class DKFNode:
                             m is None:
                 H = np.zeros(self.predicted_targets[i].H.shape) if H is None else \
                     block_diag(H, np.zeros(self.predicted_targets[i].H.shape))
+                observed_meas = m if observed_meas is None else \
+                    np.concatenate((observed_meas,
+                                    self.predicted_targets[i].state))
                 continue
             else:
                 all_measurements = m if all_measurements is None else np.concatenate((all_measurements, m))
                 H = self.predicted_targets[i].H if H is None else block_diag(H, self.predicted_targets[i].H)
                 R = self.predicted_targets[i].R if R is None else block_diag(R, self.predicted_targets[i].R)
+                observed_meas = m if observed_meas is None else \
+                    np.concatenate((observed_meas, m))
 
         Hshape = H.shape
-        # TODO is this the right contingency plan?
         H = H[~np.all(H == 0, axis=1)]
         if len(H) == 0:
+            # TODO is this the right contingency plan?
             print("{n} made no observations".format(n=self.node_id))
-            new_cov = self.full_cov_prediction
-            new_state = self.full_state_prediction
+            return None
         else:
-            T = np.concatenate((G, orth(G)), axis=1)
-            T = np.linalg.inv(T + np.random.random(T.shape) * 0.0001)
-            p = len(measurements) * 2
-            n = self.full_state_prediction.shape[0]
-            x = np.concatenate((np.zeros((p, p)), np.eye(n - p)), axis=1)
-
-            L = np.dot(x, T)
-
-            new_cov = self.gamma * np.dot(H.T, np.dot(np.linalg.inv(R), H)) + \
-                      np.dot(L.T, np.dot(np.linalg.inv(np.dot(L, np.dot(self.full_cov_prediction, L.T))), L))
-            new_cov = np.linalg.pinv(new_cov)
-
-            IM = np.dot(H, self.full_state_prediction)
-            K = np.dot(new_cov, np.dot(H.T, np.linalg.inv(R)))
-
-            new_state = self.full_state_prediction + self.gamma * np.dot(K, (all_measurements - IM))
-
-        self.full_cov_update = new_cov
-        self.full_state_update = new_state
-
-        updated_targets = self.predicted_targets
-        for i, u in enumerate(updated_targets):
-            t_state = new_state[i*4: (i*4)+4]
-            t_cov = new_cov[i*4: (i*4)+4, i*4: (i*4)+4]
-            u.set_state_cov(t_state, t_cov)
+            self.full_cov_update = all_covs
+            self.all_measurements = all_measurements
+            self.blockH = H
+            self.blockR = R
+            self.blockG = G
+            self.observed_meas = observed_meas
 
         self.measurements = measurements
-        self.updated_targets = updated_targets
 
     def check_measure_oob(self, m):
         if m is None:
@@ -192,9 +182,14 @@ class DKFNode:
         return x_out_of_bounds or y_out_of_bounds
 
     def init_consensus(self):
-        fuzz = np.random.random(self.full_cov_update.shape) * 0.0001
-        self.omega = np.linalg.inv(fuzz)
-        self.qs = np.dot(np.linalg.inv(fuzz), self.full_state_update)
+        """
+        initializes S (or omega) and z (or qs)
+        :return:
+        """
+        self.omega = np.dot(self.blockH.T, np.dot(np.linalg.inv(self.blockR),
+                                                  self.blockH))
+        self.qs = np.dot(self.blockH.T, np.dot(np.linalg.inv(self.blockR),
+                                               self.all_measurements))
 
     def consensus_filter(self, neighbor_omegas, neighbor_qs, neighbor_weights):
         sum_omega = self.omega
@@ -209,11 +204,41 @@ class DKFNode:
         self.omega = sum_omega
         self.qs = sum_qs
 
-    def after_consensus_update(self):
-        self.full_state = np.dot(np.linalg.inv(self.omega), self.qs)
-        self.full_cov = np.linalg.inv(self.omega)
+    def after_consensus_update(self, N):
+        P = self.full_cov_prediction
+        P = np.linalg.inv(np.linalg.inv(P) + self.omega)  # 42b
+        X = self.omega - np.dot(self.omega, np.dot(P, self.omega))  #42c
 
-        after_consensus_targets = self.updated_targets
+        SP = np.dot(self.omega, P)
+        # t = np.dot(np.eye(SP.shape[0]) - SP, self.all_measurements)  #42e
+        # t = np.dot(np.eye(SP.shape[0]) - SP, self.observed_meas)  # 42e
+        t = np.dot(np.eye(SP.shape[0]) - SP, self.qs)  # 42e
+
+        gram = np.dot(self.blockG.T, np.dot(X, self.blockG))
+        gram = gram + (np.random.random(gram.shape) * 0.001)
+        d = np.dot(
+                np.linalg.inv(gram),
+                np.dot(self.blockG.T, t) - \
+                np.dot(self.blockG.T,
+                       np.dot(X, self.full_state_prediction)))  # 42f
+
+        x = self.full_state_prediction + np.dot(self.blockG, d)  # 42g
+        x = x + np.dot(self.full_cov_prediction, t - np.dot(X, x))  # 42h
+
+        Y = np.dot(self.blockG,
+                   np.dot(np.linalg.inv(gram), self.blockG.T))  # 42i
+        P = self.full_cov_prediction - \
+            np.dot(Y, np.dot(X, self.full_cov_prediction)) - \
+            np.dot(self.full_cov_prediction, np.dot(X, Y))  # 42j
+
+        PX = np.dot(self.full_cov_prediction, X)
+        P = np.dot(np.eye(PX.shape[0]) - PX,
+                   P - np.dot(self.full_cov_prediction, np.dot(X, Y)))  #42k
+
+        self.full_state = x
+        self.full_cov = P / N
+
+        after_consensus_targets = self.predicted_targets
         for i, u in enumerate(after_consensus_targets):
             t_state = deepcopy(self.full_state[i * 4: (i * 4) + 4])
             t_cov = deepcopy(self.full_cov[i * 4: (i * 4) + 4,
