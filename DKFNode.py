@@ -205,6 +205,7 @@ class DKFNode:
         self.qs = sum_qs
 
     def after_consensus_update(self, N):
+        # TODO: move these to the update step THIS P NEEDS TO BE OPTIMIZED
         P = self.full_cov_prediction
         P = np.linalg.inv(np.linalg.inv(P) + self.omega)  # 42b
         X = self.omega - np.dot(self.omega, np.dot(P, self.omega))  #42c

@@ -198,6 +198,7 @@ class DKFNetwork:
         nx.set_node_attributes(self.network, nodes, 'node')
         nx.set_node_attributes(self.network, new_weights, 'weights')
 
+    # TODO: change team optimization constraint slightly
     def do_team_opt(self):
         nodes = nx.get_node_attributes(self.network, 'node')
         current_weights = nx.get_node_attributes(self.network, 'weights')
