@@ -72,9 +72,13 @@ class DKFNetwork:
                 if failure:
                     ms = [m + np.random.random(m.shape) * noise_mult for m in ms]
                 n.update(ms)
-                # n.update(measurements[i])
                 n.update_trackers(i)
 
+            """
+            Init Consensus
+            """
+            for id, n in nodes.items():
+                n.init_consensus()
 
             """
             Do Optimization and Formation Synthesis
@@ -104,11 +108,8 @@ class DKFNetwork:
                 failure = False
 
             """
-            Consensus
+            Run Consensus
             """
-            for id, n in nodes.items():
-                n.init_consensus()
-
             for l in range(L):
                 neighbor_weights = {}
                 neighbor_omegas = {}
@@ -133,7 +134,14 @@ class DKFNetwork:
                 for id, n in nodes.items():
                     n.consensus_filter(neighbor_omegas[id],
                                        neighbor_qs[id],
-                                       neighbor_weights[id],)
+                                       neighbor_weights[id])
+
+            for id, n in nodes.items():
+                n.intermediate_cov_update()
+
+            """
+            After Consensus Update
+            """
             for id, n in nodes.items():
                 n.after_consensus_update(len(nodes))
 
@@ -181,7 +189,9 @@ class DKFNetwork:
         nodes = nx.get_node_attributes(self.network, 'node')
         current_weights = nx.get_node_attributes(self.network, 'weights')
 
-        cov_data = [n.full_cov for id, n in nodes.items()]
+        # cov_data = [n.full_cov for id, n in nodes.items()]
+        # cov_data = [n.intermediate_cov for id, n in nodes.items()]
+        cov_data = [n.omega for id, n in nodes.items()]
 
         covariance_data = []
         for c in cov_data:
@@ -198,16 +208,19 @@ class DKFNetwork:
         nx.set_node_attributes(self.network, nodes, 'node')
         nx.set_node_attributes(self.network, new_weights, 'weights')
 
-    # TODO: change team optimization constraint slightly
     def do_team_opt(self):
         nodes = nx.get_node_attributes(self.network, 'node')
         current_weights = nx.get_node_attributes(self.network, 'weights')
 
-        cov_data = [n.full_cov for id, n in nodes.items()]
+        # cov_data = [n.full_cov for id, n in nodes.items()]
+        # cov_data = [n.intermediate_cov for id, n in nodes.items()]
+        cov_data = [n.full_cov_prediction for id, n in nodes.items()]
+        omega_data = [n.omega for id, n in nodes.items()]
 
         new_config, new_weights = team_opt2(self.adjacency_matrix(),
                                             current_weights,
-                                            cov_data)
+                                            cov_data,
+                                            omega_data)
         G = nx.from_numpy_matrix(new_config)
         self.network = G
         nx.set_node_attributes(self.network, nodes, 'node')
@@ -218,7 +231,9 @@ class DKFNetwork:
 
         current_neighbors = list(self.network.neighbors(failed_node))
 
-        cov_data = [n.full_cov for id, n in nodes.items()]
+        # cov_data = [n.full_cov for id, n in nodes.items()]
+        # cov_data = [n.intermediate_cov for id, n in nodes.items()]
+        cov_data = [n.full_cov_prediction for id, n in nodes.items()]
 
         best_cov_id = None
         best_cov = np.inf

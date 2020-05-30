@@ -50,7 +50,8 @@ class DKFNode:
         self.omega = None
         self.qs = None
 
-        # Consensus Update Results
+        # Consensus Intermediate Results
+        self.intermediate_cov = None
 
         # TRACKERS
         self.observations = {}
@@ -204,24 +205,23 @@ class DKFNode:
         self.omega = sum_omega
         self.qs = sum_qs
 
-    def after_consensus_update(self, N):
-        # TODO: move these to the update step THIS P NEEDS TO BE OPTIMIZED
+    def intermediate_cov_update(self):
         P = self.full_cov_prediction
         P = np.linalg.inv(np.linalg.inv(P) + self.omega)  # 42b
+        self.intermediate_cov = P
+
+    def after_consensus_update(self, N):
+        P = self.intermediate_cov
         X = self.omega - np.dot(self.omega, np.dot(P, self.omega))  #42c
 
         SP = np.dot(self.omega, P)
-        # t = np.dot(np.eye(SP.shape[0]) - SP, self.all_measurements)  #42e
-        # t = np.dot(np.eye(SP.shape[0]) - SP, self.observed_meas)  # 42e
         t = np.dot(np.eye(SP.shape[0]) - SP, self.qs)  # 42e
 
         gram = np.dot(self.blockG.T, np.dot(X, self.blockG))
         gram = gram + (np.random.random(gram.shape) * 0.001)
         d = np.dot(
                 np.linalg.inv(gram),
-                np.dot(self.blockG.T, t) - \
-                np.dot(self.blockG.T,
-                       np.dot(X, self.full_state_prediction)))  # 42f
+                np.dot(self.blockG.T, t) - np.dot(self.blockG.T, np.dot(X, self.full_state_prediction)))  # 42f
 
         x = self.full_state_prediction + np.dot(self.blockG, d)  # 42g
         x = x + np.dot(self.full_cov_prediction, t - np.dot(X, x))  # 42h

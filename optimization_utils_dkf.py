@@ -102,15 +102,15 @@ def agent_opt(adj_mat, current_weights, covariance_data, ne=1, failed_node=None)
     return new_config, new_weights
 
 
-def team_opt2(adj_mat, current_weights, covariance_matrices, ne=1):
+def team_opt2(adj_mat, current_weights, covariance_matrices, omegas, ne=1):
     """
    Runs the team optimization problem
 
    :param adj_mat: the Adjacency matrix
    :param current_weights: current node weights
    :param covariance_data: list of each node's large covariance matrix
+   :param omegas: list of each node's omega matrix
    :param ne: limit for number of edges to change
-   :param failed_node: the node that fails
    :return: new adjacency matrix and new weights
    """
     edge_mod_limit = ne * 2
@@ -133,7 +133,13 @@ def team_opt2(adj_mat, current_weights, covariance_matrices, ne=1):
     for i in range(n):
         start = i * s
         end = i * s + s
-        cov_array[start:end, 0:s] = covariance_matrices[i]
+        cov_array[start:end, 0:s] = omegas[i]
+
+    inv_cov_array = np.zeros((n * s, s))
+    for i in range(n):
+        start = i * s
+        end = i * s + s
+        inv_cov_array[start:end, 0:s] = np.linalg.inv(covariance_matrices[i])
 
     # Init Problem
     problem = pic.Problem()
@@ -158,9 +164,10 @@ def team_opt2(adj_mat, current_weights, covariance_matrices, ne=1):
     # Add Params (ie constant affine expressions to help with creating constraints)
     I = pic.new_param('I', np.eye(s))
     cov_array_param = pic.new_param('covs', cov_array)
+    inv_cov_array_param = pic.new_param('inv_covs', inv_cov_array)
 
     # Set Objective
-    problem.set_objective('min', pic.trace(Pbar))
+    problem.set_objective('min', beta * pic.trace(Pbar))
 
     # Constraints
 
@@ -194,7 +201,7 @@ def team_opt2(adj_mat, current_weights, covariance_matrices, ne=1):
     problem.add_constraint(schur >= 0)
 
     # Kron constraint
-    problem.add_constraint(pic.kron(A, I) * cov_array_param == delta_array)
+    problem.add_constraint(pic.kron(A, I) * cov_array_param + inv_cov_array_param == delta_array)
 
     # Set the usual Constraints
     problem.add_constraint(mu >= 0.001)

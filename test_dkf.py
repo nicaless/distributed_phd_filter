@@ -162,6 +162,7 @@ class FilterNodeTests(TestCase):
         self.node0.consensus_filter([self.node1.omega],
                                     [self.node1.qs],
                                     [0.5])
+        self.node0.intermediate_cov_update()
         self.node0.after_consensus_update(2)
 
         assert_raises(AssertionError, assert_array_equal,
@@ -189,6 +190,7 @@ class FilterNodeTests(TestCase):
         self.node0.consensus_filter([self.node1.omega],
                                     [self.node1.qs],
                                     [0.5])
+        self.node0.intermediate_cov_update()
         self.node0.after_consensus_update(2)
 
         assert_raises(AssertionError, assert_array_equal,
