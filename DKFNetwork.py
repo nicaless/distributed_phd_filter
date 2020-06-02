@@ -12,7 +12,8 @@ from ospa import *
 from target import Target
 
 from optimization_utils_dkf import *
-from reconfig_utils import *
+from reconfig_utils_dkf import *
+
 
 class DKFNetwork:
     def __init__(self,
@@ -96,15 +97,14 @@ class DKFNetwork:
                     self.do_random_opt(fail_node)
 
                 # Formation Synthesis
-                # current_coords = {nid: n.position for nid, n in nodes.items()}
-                # fov = {nid: n.fov for nid, n in nodes.items()}
-                # centroid = self.get_centroid(fail_node)
-                #
-                # new_coords = generate_coords(self.adjacency_matrix(),
-                #                              current_coords, fov, centroid)
-                # if new_coords:
-                #     for id, n in nodes.items():
-                #         n.update_position(new_coords[id])
+                current_coords = {nid: n.position for nid, n in nodes.items()}
+                fov = {nid: n.fov for nid, n in nodes.items()}
+
+                new_coords = generate_coords(self.adjacency_matrix(),
+                                             current_coords, fov)
+                if new_coords:
+                    for id, n in nodes.items():
+                        n.update_position(new_coords[id])
                 failure = False
 
             """

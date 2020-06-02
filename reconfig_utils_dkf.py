@@ -4,7 +4,7 @@ import quadpy
 import platform
 
 
-def generate_coords(new_config, current_coords, fov, target_estimate,
+def generate_coords(new_config, current_coords, fov,
                     bbox=np.array([(-50, 50), (-50, 50), (10, 100)]),
                     delta=10, safe_dist=10, connect_dist=25, k=-0.1, steps=1000,
                     lax=True):
@@ -43,10 +43,8 @@ def generate_coords(new_config, current_coords, fov, target_estimate,
             T = temperature[i]
             propose_coords = propose(new_coords, delta)
             current_E = energyCoverage(new_config, new_coords, fov,
-                                       target_estimate,
                                        H[i], k, safe_dist, connect_dist, bbox)
             propose_E = energyCoverage(new_config, propose_coords, fov,
-                                       target_estimate,
                                        H[i], k, safe_dist, connect_dist, bbox)
             if propose_E < current_E:
                 new_coords = deepcopy(propose_coords)
@@ -88,8 +86,8 @@ def propose(current_coords, delta):
 
     return propose_coords
 
-# TODO: with new Hc and Ho functions
-def energyCoverage(config, propose_coords, fov, target_estimate,
+
+def energyCoverage(config, propose_coords, fov,
                    H, k, safe_dist, connect_dist, bbox):
     """
     Get Energy, try to congregate around centroid of PHD
@@ -105,24 +103,23 @@ def energyCoverage(config, propose_coords, fov, target_estimate,
     :return: Energy value
     """
     total_coverage = 0
-    # TODO change total converage calculation to total HC
-    for _, f in fov.items():
-        total_coverage = total_coverage + ((f ** 2) * np.pi)
     coverage_penalties = 0
+    n = len(fov)
+    for i in range(n):
+        total_coverage += Hc(propose_coords[i], fov[i])
+        for j in range(i, n):
+            coverage_penalties += Ho(propose_coords[i], propose_coords[j],
+                                     fov[i], fov[j])
+
     sum_box = 0
     sum_safe = 0
     sum_conn = 0
     bbox = bbox
-    sum_x = 0
-    sum_y = 0
 
     n = len(propose_coords)
     for i in range(n):
         pos = propose_coords[i]
         sum_box_node = 0
-
-        sum_x += pos[0]
-        sum_y += pos[1]
 
         for d in range(len(bbox)):
             sum_box_node = sum_box_node + (ph(pos[d] - bbox[d, 1], H) +
@@ -138,11 +135,6 @@ def energyCoverage(config, propose_coords, fov, target_estimate,
             else:
                 sum_conn = sum_conn + (ph(connect_dist - d, H))
 
-            overlap = 2 * fov[i] - d
-            p = ((overlap ** 2) * np.pi) / 2
-            coverage_penalties = coverage_penalties + p
-
-    # TODO change to return (k*H) + sum_box + sum_safe + sum_conn
     return (k * total_coverage) + coverage_penalties + \
            sum_box + sum_safe + sum_conn
 
@@ -204,12 +196,22 @@ def ph(x, H):
 def Hc(drone_pos, fov_radius, focal_length=0.04, sigma=0.3, R=3, kappa=4):
     x = drone_pos[0]
     y = drone_pos[1]
+    z = drone_pos[2]
     r = fov_radius
 
-    scheme = quadpy.s2.lether(6)
-    val = scheme.integrate(lambda x: fpers(x, drone_pos, fov_radius, focal_length=focal_length) *
-                                     fres(x, drone_pos, fov_radius, focal_length=focal_length,
-                                          sigma=sigma, R=R, kappa=kappa),
+    a1 = (focal_length / np.sqrt(
+        (focal_length ** 2) + (fov_radius ** 2))) ** kappa
+    b1 = z
+    c1 = focal_length / np.sqrt((focal_length ** 2) + (fov_radius ** 2))
+
+    a2 = (focal_length / np.sqrt((focal_length ** 2) +
+                                 (fov_radius ** 2))) ** kappa
+    b2 = R
+    c2 = 2 * (sigma ** 2)
+
+    scheme = quadpy.disk.lether(6)
+    val = scheme.integrate(lambda p: (fpers(p[0], a1, b1, c1) *
+                                      fres(p[0], a2, b2, c2)),
                            [x, y], r
                            )
     return val
@@ -226,40 +228,50 @@ def Ho(drone1_pos, drone2_pos, fov1_radius, fov2_radius, focal_length=0.04, sigm
     d = np.linalg.norm(drone1_pos_0_height - drone2_pos_0_height)
 
     overlap = 2 * max(fov1_radius, fov2_radius) - d
-    scheme = quadpy.s2.lether(6)
-    val1 = scheme.integrate(lambda x: fpers(x, drone1_pos, fov1_radius, focal_length=focal_length) *
-                                     fres(x, drone1_pos, fov1_radius, focal_length=focal_length,
-                                          sigma=sigma, R=R, kappa=kappa),
+
+    # Drone 1 vars
+    a1 = (focal_length / np.sqrt(
+        (focal_length ** 2) + (fov1_radius ** 2))) ** kappa
+    b1 = drone1_pos[2]
+    c1 = focal_length / np.sqrt((focal_length ** 2) + (fov1_radius ** 2))
+
+    a2 = (focal_length / np.sqrt((focal_length ** 2) +
+                                 (fov1_radius ** 2))) ** kappa
+    b2 = R
+    c2 = 2 * (sigma ** 2)
+
+    # Drone 2 vars
+    a3 = (focal_length / np.sqrt(
+        (focal_length ** 2) + (fov2_radius ** 2))) ** kappa
+    b3 = drone2_pos[2]
+    c3 = focal_length / np.sqrt((focal_length ** 2) + (fov2_radius ** 2))
+
+    a4 = (focal_length / np.sqrt((focal_length ** 2) +
+                                 (fov2_radius ** 2))) ** kappa
+    b4 = R
+    c4 = 2 * (sigma ** 2)
+
+    scheme = quadpy.disk.lether(6)
+    val1 = scheme.integrate(lambda x: (fpers(x[0], a1, b1, c1) *
+                                       fres(x[0], a2, b2, c2)),
                            [mid_x, mid_y], overlap
                            )
-    val2 = scheme.integrate(lambda x: fpers(x, drone2_pos, fov2_radius, focal_length=focal_length) *
-                                      fres(x, drone2_pos, fov2_radius, focal_length=focal_length,
-                                           sigma=sigma, R=R, kappa=kappa),
+
+    val2 = scheme.integrate(lambda x: (fpers(x[0], a3, b3, c3) *
+                                       fres(x[0], a4, b4, c4)),
                             [mid_x, mid_y], overlap
                             )
     return min(val1, val2)
 
 
-def fpers(point, drone_pos, fov_radius, focal_length=0.04):
-    drone_pos_0_height = deepcopy(drone_pos)
-    drone_pos_0_height[2] = 0
-    a = np.sqrt((focal_length ** 2) + (fov_radius ** 2)) / \
-        (np.sqrt((focal_length ** 2) + (fov_radius ** 2)) - focal_length)
-    b = drone_pos[2] / (np.linalg.norm(point - drone_pos_0_height))
-    c = focal_length / np.sqrt((focal_length ** 2) + (fov_radius ** 2))
-
-    return a * (b - c)
+def fpers(p, a, b, c):
+    if p.all() == 0:
+        return a * b
+    return a * ((b / p) - c)
 
 
-def fres(point, drone_pos, fov_radius, focal_length=0.04, sigma=0.3, R=3, kappa=4):
-    drone_pos_0_height = deepcopy(drone_pos)
-    drone_pos_0_height[2] = 0
-
-    a = (focal_length / np.sqrt((focal_length ** 2) + (fov_radius ** 2))) ** kappa
-    b = np.linalg.norm(point - drone_pos_0_height) - R ** 2
-    c = 2 * (sigma ** 2)
-
-    return a * np.exp(-1 * b / c)
+def fres(p, a, b, c):
+    return a * np.exp(-1 * ((p - b) ** 2) / c)
 
 
 
