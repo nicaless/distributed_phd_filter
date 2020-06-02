@@ -100,6 +100,7 @@ class DKFNetwork:
                 current_coords = {nid: n.position for nid, n in nodes.items()}
                 fov = {nid: n.fov for nid, n in nodes.items()}
 
+                # TODO: track overall coverage quality
                 new_coords = generate_coords(self.adjacency_matrix(),
                                              current_coords, fov)
                 if new_coords:

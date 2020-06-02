@@ -161,6 +161,7 @@ for noise in range(len(noise_mult)):
         filternetwork.save_topologies(trial_name + '/topologies')
 
 
+# TODO: covert to be series of overhead plots to include tracker positions
 print('plot')
 # Plot Targets
 est = pd.read_csv('4_nodes_test/0_greedy/estimates.csv')
@@ -182,6 +183,9 @@ for t in range(num_targets):
 plt.legend()
 plt.savefig('test.png')
 
+# TODO: plot coverage quality
+# TODO: plot errors (are these errors calculated correctly)
+# TODO: plot covariance
 
 
 

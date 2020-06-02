@@ -86,7 +86,8 @@ def propose(current_coords, delta):
 
     return propose_coords
 
-
+# TODO: pass R values to be translated to sigma values (inversely proportional) in Ho and Hc funcs
+# TODO: return overall coverage quality
 def energyCoverage(config, propose_coords, fov,
                    H, k, safe_dist, connect_dist, bbox):
     """
