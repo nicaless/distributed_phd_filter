@@ -184,8 +184,9 @@ plt.legend()
 plt.savefig('test.png')
 
 # TODO: plot coverage quality
-# TODO: plot errors (are these errors calculated correctly)
+# TODO: plot errors
 # TODO: plot covariance
+# TODO: edge density
 
 
 

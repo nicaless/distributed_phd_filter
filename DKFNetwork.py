@@ -33,6 +33,7 @@ class DKFNetwork:
         self.errors = {}
         self.max_trace_cov = {}
         self.mean_trace_cov = {}
+        self.surveillance_quality = {}
 
 
     """
@@ -62,6 +63,8 @@ class DKFNetwork:
             True Target Update With Inputs
             """
             for t, target in enumerate(self.targets):
+                # TODO check target next state before actually doing next state
+                # and divert target in negative course if about to oob
                 target.next_state(input=ins[t])
 
             """
@@ -99,10 +102,11 @@ class DKFNetwork:
                 # Formation Synthesis
                 current_coords = {nid: n.position for nid, n in nodes.items()}
                 fov = {nid: n.fov for nid, n in nodes.items()}
+                Rs = {nid: n.R for nid, n in nodes.items()}
 
-                # TODO: track overall coverage quality
-                new_coords = generate_coords(self.adjacency_matrix(),
-                                             current_coords, fov)
+                new_coords, sq = generate_coords(self.adjacency_matrix(),
+                                                 current_coords, fov, Rs)
+                self.surveillance_quality[i] = sq
                 if new_coords:
                     for id, n in nodes.items():
                         n.update_position(new_coords[id])
@@ -339,6 +343,7 @@ class DKFNetwork:
 
         return cov_data
 
+    # TODO:
     def calc_errors(self, true_targets):
         nodes = nx.get_node_attributes(self.network, 'node')
 
@@ -375,6 +380,12 @@ class DKFNetwork:
         mean_tr_cov = pd.DataFrame.from_dict(self.mean_trace_cov, orient='index')
         mean_tr_cov.columns = ['value']
         mean_tr_cov.to_csv(path + '/mean_tr_cov.csv', index_label='time')
+
+        # Save Surveillance Quality
+        if len(self.surveillance_quality) != 0:
+            surv_q = pd.DataFrame.from_dict(self.surveillance_quality, orient='index')
+            surv_q.columns = ['value']
+            surv_q.to_csv(path + '/surveillance_quality.csv', index_label='time')
 
     def save_estimates(self, path):
         all_nodes = nx.get_node_attributes(self.network, 'node')

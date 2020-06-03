@@ -4,7 +4,7 @@ import quadpy
 import platform
 
 
-def generate_coords(new_config, current_coords, fov,
+def generate_coords(new_config, current_coords, fov, Rs,
                     bbox=np.array([(-50, 50), (-50, 50), (10, 100)]),
                     delta=10, safe_dist=10, connect_dist=25, k=-0.1, steps=1000,
                     lax=True):
@@ -42,10 +42,11 @@ def generate_coords(new_config, current_coords, fov,
         for i in range(steps):
             T = temperature[i]
             propose_coords = propose(new_coords, delta)
-            current_E = energyCoverage(new_config, new_coords, fov,
+            current_E, currSQ = energyCoverage(new_config, new_coords, fov, Rs,
                                        H[i], k, safe_dist, connect_dist, bbox)
-            propose_E = energyCoverage(new_config, propose_coords, fov,
-                                       H[i], k, safe_dist, connect_dist, bbox)
+            propose_E, propSQ = energyCoverage(new_config, propose_coords, fov,
+                                               Rs, H[i], k, safe_dist,
+                                               connect_dist, bbox)
             if propose_E < current_E:
                 new_coords = deepcopy(propose_coords)
             else:
@@ -62,11 +63,11 @@ def generate_coords(new_config, current_coords, fov,
         if invalid_configs > invalid_iters_limit:
             print('could not find valid config')
             if lax:
-                return new_coords
+                return new_coords, propSQ
             else:
                 return False
 
-    return new_coords
+    return new_coords, propSQ
 
 
 def propose(current_coords, delta):
@@ -86,9 +87,9 @@ def propose(current_coords, delta):
 
     return propose_coords
 
-# TODO: pass R values to be translated to sigma values (inversely proportional) in Ho and Hc funcs
+
 # TODO: return overall coverage quality
-def energyCoverage(config, propose_coords, fov,
+def energyCoverage(config, propose_coords, fov, Rs,
                    H, k, safe_dist, connect_dist, bbox):
     """
     Get Energy, try to congregate around centroid of PHD
@@ -107,10 +108,16 @@ def energyCoverage(config, propose_coords, fov,
     coverage_penalties = 0
     n = len(fov)
     for i in range(n):
-        total_coverage += Hc(propose_coords[i], fov[i])
+        rpd = np.linalg.det(Rs[i] - np.eye(Rs[i].shape[0]))
+        sigma = 0.3 + (rpd * 0.01)
+        # sigma = 0.3
+        total_coverage += Hc(propose_coords[i], fov[i], sigma=sigma)
         for j in range(i, n):
+            rpd_j = np.linalg.det(Rs[j] - np.eye(Rs[j].shape[0]))
+            sigma = 0.3 + (min(rpd, rpd_j) * 0.01)
+            # sigma = 0.3
             coverage_penalties += Ho(propose_coords[i], propose_coords[j],
-                                     fov[i], fov[j])
+                                     fov[i], fov[j], sigma=sigma)
 
     sum_box = 0
     sum_safe = 0
@@ -136,8 +143,10 @@ def energyCoverage(config, propose_coords, fov,
             else:
                 sum_conn = sum_conn + (ph(connect_dist - d, H))
 
-    return (k * total_coverage) + coverage_penalties + \
-           sum_box + sum_safe + sum_conn
+    energy = (k * total_coverage) + coverage_penalties + \
+             sum_box + sum_safe + sum_conn
+    surveillance_quality = total_coverage - coverage_penalties
+    return energy, surveillance_quality
 
 
 def isValidConfig(config, coords, safe_dist, connect_dist, bbox):
@@ -194,7 +203,7 @@ def ph(x, H):
         return np.exp(H * x)
 
 
-def Hc(drone_pos, fov_radius, focal_length=0.04, sigma=0.3, R=3, kappa=4):
+def Hc(drone_pos, fov_radius, focal_length=0.04, sigma=0.3, R=30, kappa=0.5):
     x = drone_pos[0]
     y = drone_pos[1]
     z = drone_pos[2]
@@ -218,7 +227,7 @@ def Hc(drone_pos, fov_radius, focal_length=0.04, sigma=0.3, R=3, kappa=4):
     return val
 
 
-def Ho(drone1_pos, drone2_pos, fov1_radius, fov2_radius, focal_length=0.04, sigma=0.3, R=3, kappa=4):
+def Ho(drone1_pos, drone2_pos, fov1_radius, fov2_radius, focal_length=0.04, sigma=0.3, R=30, kappa=0.5):
     mid_x = (drone1_pos[0] + drone2_pos[0]) / 2.
     mid_y = (drone1_pos[1] + drone2_pos[1]) / 2.
 
@@ -228,7 +237,10 @@ def Ho(drone1_pos, drone2_pos, fov1_radius, fov2_radius, focal_length=0.04, sigm
     drone2_pos_0_height[2] = 0
     d = np.linalg.norm(drone1_pos_0_height - drone2_pos_0_height)
 
-    overlap = 2 * max(fov1_radius, fov2_radius) - d
+    overlap = d - ((d - fov1_radius) + (d - fov2_radius))
+    if overlap <= 0:
+        return 0
+    overlap = overlap / 3
 
     # Drone 1 vars
     a1 = (focal_length / np.sqrt(

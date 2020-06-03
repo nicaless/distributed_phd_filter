@@ -250,11 +250,12 @@ class DKFNode:
     def update_trackers(self, i, pre_consensus=True):
         if pre_consensus:
             self.observations[i] = self.measurements
-            self.node_positions[i] = self.position
 
             self.preconsensus_positions[i] = [t.state for t in self.targets]
             self.preconsensus_target_covs[i] = [t.state_cov for t in self.targets]
         else:
+            self.node_positions[i] = self.position
+
             self.consensus_positions[i] = [t.state for t in self.targets]
             self.consensus_target_covs[i] = [t.state_cov for t in self.targets]
 
