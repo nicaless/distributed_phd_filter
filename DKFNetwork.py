@@ -15,6 +15,9 @@ from optimization_utils_dkf import *
 from reconfig_utils_dkf import *
 
 
+DEFAULT_BBOX = np.array([(-50, 50), (-50, 50), (10, 100)])
+
+
 class DKFNetwork:
     def __init__(self,
                  nodes,
@@ -63,9 +66,14 @@ class DKFNetwork:
             True Target Update With Inputs
             """
             for t, target in enumerate(self.targets):
+                new_input = deepcopy(ins[t])
+                next_state = target.get_next_state(input=ins[t])
+                new_input = check_oob(next_state, new_input)
+                target.next_state(input=new_input)
+
                 # TODO check target next state before actually doing next state
                 # and divert target in negative course if about to oob
-                target.next_state(input=ins[t])
+                # target.next_state(input=ins[t])
 
             """
             Local Target Estimation
@@ -343,19 +351,17 @@ class DKFNetwork:
 
         return cov_data
 
-    # TODO:
     def calc_errors(self, true_targets):
         nodes = nx.get_node_attributes(self.network, 'node')
 
         node_errors = {}
         for id, node in nodes.items():
-            errors = []
+            all_states = None
             for i, t in enumerate(true_targets):
-                # e = mahalanobis(node.targets[i].state,
-                #                 t.state,
-                #                 node.targets[i].state_cov)
-                e = np.linalg.norm(node.targets[i].state - t.state)
-                errors.append(e)
+                all_states = true_targets[i].state if all_states is None else \
+                    np.concatenate((all_states, true_targets[i].state))
+
+            errors = np.linalg.norm(node.full_state - all_states)
             node_errors[id] = errors
 
         return node_errors
@@ -367,8 +373,6 @@ class DKFNetwork:
     def save_metrics(self, path):
         # Save Errors
         errors = pd.DataFrame.from_dict(self.errors, orient='index')
-        for i in range(len(self.network.nodes)):
-            errors[i] = errors[i].apply(np.nanmean)
         errors.to_csv(path + '/errors.csv', index_label='time')
 
         # Save Max Trace Cov
@@ -443,3 +447,17 @@ class DKFNetwork:
         for t, a in self.adjacencies.items():
             np.savetxt(path + '/{t}.csv'.format(t=t),
                        a, delimiter=',')
+
+
+def check_oob(state, ins):
+    x = state[0][0]
+    y = state[1][0]
+
+    x_out_of_bounds = x < DEFAULT_BBOX[0][0] or x > DEFAULT_BBOX[0][0]
+    if x_out_of_bounds:
+        ins[0][0] *= -1
+    y_out_of_bounds = y < DEFAULT_BBOX[1][0] or y > DEFAULT_BBOX[1][0]
+    if y_out_of_bounds:
+        ins[1][0] *= -1
+
+    return ins

@@ -171,7 +171,6 @@ def team_opt2(adj_mat, current_weights, covariance_matrices, omegas, ne=1):
 
     # Constraints
 
-    # TODO: This may not work
     # Setting Additional Constraint such that delta_bar elements equal elements in delta_list (with some tolerance)
     for i in range(n):
         start = i * s
@@ -183,14 +182,12 @@ def team_opt2(adj_mat, current_weights, covariance_matrices, omegas, ne=1):
             # Fill everything below with 0s
             problem.add_constraint(delta_bar[end:, start:end] == np.zeros(((n * s) - end, s)))
 
-    # TODO: This may not work
     # Setting Additional Constraint such that delta_array elements equal elements in delta_list (with some tolerance)
     for i in range(n):
         start = i * s
         end = i * s + s
         problem.add_constraint(abs(delta_array[start:end, :] - delta_list[i]) <= tol)
 
-    # TODO: This may not work
     # Setting Additional Constraint such that delta_bar and Pbar elements in schur variable (with some tolerance)
     problem.add_constraint(abs(schur[0:p_size, 0:p_size] - Pbar) <= tol)
     problem.add_constraint(abs(schur[p_size:, p_size:] - delta_bar) <= tol)

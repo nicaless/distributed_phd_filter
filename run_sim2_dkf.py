@@ -108,7 +108,7 @@ For Loop for all Simulations
 saved_fail_sequence = None
 for noise in range(len(noise_mult)):
     # for opt in ['base', 'agent', 'team', 'greedy', 'random']:
-    for opt in ['base', 'agent']:
+    for opt in ['base']:
         trial_name = run_name + '/{noise}_{o}'.format(noise=noise,
                                                       o=opt)
         print(trial_name)
@@ -164,7 +164,7 @@ for noise in range(len(noise_mult)):
 # TODO: covert to be series of overhead plots to include tracker positions
 print('plot')
 # Plot Targets
-est = pd.read_csv('4_nodes_test/0_greedy/estimates.csv')
+est = pd.read_csv('4_nodes_test/0_team/estimates.csv')
 # est = est[est['time'] < 17]
 colors = ['red', 'blue', 'green', 'orange']
 for t in range(num_targets):
@@ -180,6 +180,8 @@ for t in range(num_targets):
     plt.plot(e['x'].values, e['y'].values, '--',
              label="Estimate {t}".format(t=t), alpha=0.5, color=colors[t])
 
+plt.xlim([-50, 50])
+plt.ylim([-50, 50])
 plt.legend()
 plt.savefig('test.png')
 

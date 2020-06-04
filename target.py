@@ -55,6 +55,14 @@ class Target:
         self.all_states.append(state)
         self.all_cov.append(cov)
 
+    def get_next_state(self, input=None):
+        x = self.state
+        if input is not None:
+            next_state = np.dot(self.A, x) + np.dot(self.B, input)
+        else:
+            next_state = np.dot(self.A, x) + np.dot(self.B, self.U)
+        return next_state
+
     def next_state(self, input=None, noise=False):
         x = self.state
         if input is not None:
