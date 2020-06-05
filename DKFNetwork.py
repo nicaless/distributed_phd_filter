@@ -51,7 +51,6 @@ class DKFNetwork:
 
         failure = False
         for i, ins in inputs.items():
-            print(i)
             if fail_int is not None or fail_sequence is not None:
                 if fail_int is not None:
                     if i in fail_int:
@@ -70,10 +69,6 @@ class DKFNetwork:
                 next_state = target.get_next_state(input=ins[t])
                 new_input = check_oob(next_state, new_input)
                 target.next_state(input=new_input)
-
-                # TODO check target next state before actually doing next state
-                # and divert target in negative course if about to oob
-                # target.next_state(input=ins[t])
 
             """
             Local Target Estimation
@@ -202,8 +197,6 @@ class DKFNetwork:
         nodes = nx.get_node_attributes(self.network, 'node')
         current_weights = nx.get_node_attributes(self.network, 'weights')
 
-        # cov_data = [n.full_cov for id, n in nodes.items()]
-        # cov_data = [n.intermediate_cov for id, n in nodes.items()]
         cov_data = [n.omega for id, n in nodes.items()]
 
         covariance_data = []
@@ -225,12 +218,14 @@ class DKFNetwork:
         nodes = nx.get_node_attributes(self.network, 'node')
         current_weights = nx.get_node_attributes(self.network, 'weights')
 
-        # cov_data = [n.full_cov for id, n in nodes.items()]
-        # cov_data = [n.intermediate_cov for id, n in nodes.items()]
         cov_data = [n.full_cov_prediction for id, n in nodes.items()]
         omega_data = [n.omega for id, n in nodes.items()]
 
-        new_config, new_weights = team_opt2(self.adjacency_matrix(),
+        # new_config, new_weights = team_opt2(self.adjacency_matrix(),
+        #                                     current_weights,
+        #                                     cov_data,
+        #                                     omega_data)
+        new_config, new_weights = team_opt(self.adjacency_matrix(),
                                             current_weights,
                                             cov_data,
                                             omega_data)
@@ -244,8 +239,6 @@ class DKFNetwork:
 
         current_neighbors = list(self.network.neighbors(failed_node))
 
-        # cov_data = [n.full_cov for id, n in nodes.items()]
-        # cov_data = [n.intermediate_cov for id, n in nodes.items()]
         cov_data = [n.full_cov_prediction for id, n in nodes.items()]
 
         best_cov_id = None
@@ -453,11 +446,16 @@ def check_oob(state, ins):
     x = state[0][0]
     y = state[1][0]
 
-    x_out_of_bounds = x < DEFAULT_BBOX[0][0] or x > DEFAULT_BBOX[0][0]
+    x_out_of_bounds = x < (DEFAULT_BBOX[0][0] + 5) or x > (DEFAULT_BBOX[0][1] - 5)
     if x_out_of_bounds:
-        ins[0][0] *= -1
-    y_out_of_bounds = y < DEFAULT_BBOX[1][0] or y > DEFAULT_BBOX[1][0]
+        if x < DEFAULT_BBOX[0][0]:
+            ins[0][0] = abs(state[2][0])
+        else:
+            ins[0][0] = -1 * state[2][0]
+    y_out_of_bounds = y < (DEFAULT_BBOX[1][0] + 5) or y > (DEFAULT_BBOX[1][1] - 5)
     if y_out_of_bounds:
-        ins[1][0] *= -1
-
+        if y < DEFAULT_BBOX[0][0]:
+            ins[1][0] = abs(state[3][0])
+        else:
+            ins[1][0] = -1 * state[3][0]
     return ins

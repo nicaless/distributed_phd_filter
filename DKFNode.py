@@ -158,7 +158,7 @@ class DKFNode:
         H = H[~np.all(H == 0, axis=1)]
         if len(H) == 0:
             # TODO is this the right contingency plan?
-            print("{n} made no observations".format(n=self.node_id))
+            # print("{n} made no observations".format(n=self.node_id))
             return None
         else:
             self.full_cov_update = all_covs

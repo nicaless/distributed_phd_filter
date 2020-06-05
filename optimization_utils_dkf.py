@@ -102,6 +102,66 @@ def agent_opt(adj_mat, current_weights, covariance_data, ne=1, failed_node=None)
     return new_config, new_weights
 
 
+def team_opt(adj_mat, current_weights, covariance_matrices, omegas, ne=1):
+    A = adj_mat
+    n = adj_mat.shape[0]
+    for c, cov in enumerate(covariance_matrices):
+        f_name = 'misdp_data/inverse_covariance_matrices/{c}.csv'
+        np.savetxt(f_name.format(c=c), np.asarray(np.linalg.inv(cov)), delimiter=",")
+
+    for o, om in enumerate(omegas):
+        f_name = 'misdp_data/omega_matrices/{o}.csv'
+        np.savetxt(f_name.format(o=o), np.asarray(om), delimiter=",")
+
+    np.savetxt('misdp_data/adj_mat.csv', A, delimiter=",")
+    if platform.system() == 'Linux':
+        mat_command = 'matlab '
+    else:
+        mat_command = '/Applications/MATLAB_R2019a.app/bin/matlab '
+    matlab_string = mat_command + '-nodesktop -nosplash -r "MISDP_new_copy({e});exit;"'.format(e=ne)
+    print('Starting Up MATLAB')
+    os.system(matlab_string)
+    print('Reading MATLAB results')
+
+    if os.path.exists('misdp_data/new_weights.csv'):
+        new_weights = []
+        with open('misdp_data/new_weights.csv', 'r') as f:
+            readCSV = csv.reader(f, delimiter=',')
+            for row in readCSV:
+                data = list(map(float, row))
+                new_weights.append(data)
+        new_weights_mat = np.array(new_weights)
+    else:
+        new_weights = current_weights
+
+    if os.path.exists('misdp_data/new_A.csv'):
+        new_A = []
+        with open('misdp_data/new_A.csv', 'r') as f:
+            readCSV = csv.reader(f, delimiter=',')
+            for row in readCSV:
+                data = list(map(float, row))
+                new_A.append(data)
+        new_A = np.array(new_A)
+    else:
+        new_A = A
+
+    if 'new_weights_mat' in locals():
+        if np.array_equal(new_weights_mat, new_A):
+            new_weights = current_weights
+        else:
+            new_weights = {}
+            for i in range(n):
+                new_weights[i] = {}
+            for i in range(n):
+                new_weights[i][i] = new_weights_mat[i, i]
+                for j in range(i + 1, n):
+                    new_weights[i][j] = new_weights_mat[i, j]
+                    new_weights[j][i] = new_weights_mat[j, i]
+
+    return new_A, new_weights
+
+
+
 def team_opt2(adj_mat, current_weights, covariance_matrices, omegas, ne=1):
     """
    Runs the team optimization problem
@@ -225,6 +285,11 @@ def team_opt2(adj_mat, current_weights, covariance_matrices, omegas, ne=1):
     print('status: {s}'.format(s=problem_status))
     if problem_status != 'integer optimal':
         return adj_mat, current_weights
+
+    # print(np.linalg.inv(delta_bar.value) - Pbar.value)
+    # # print(np.dot(delta_bar.value, Pbar.value))
+    # print(np.linalg.det(np.dot(delta_bar.value, Pbar.value)))
+    # print(np.trace(np.dot(delta_bar.value, Pbar.value)))
 
     new_config = np.zeros(adj_mat.shape)
     new_weights = {}

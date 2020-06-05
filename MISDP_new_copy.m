@@ -40,14 +40,24 @@ function [A, PI] = MISDP_new_copy(ne)
     % Read CSV of current adjacency matrix
     adj_mat = readmatrix('misdp_data/adj_mat.csv');
 
+    % Read CSV of current omega matrices
+    % disp('reducing vals for computation purposes');
+    omega_dir = './misdp_data/omega_matrices/';
+    omega_matrices = dir(fullfile(omega_dir, '*.csv'));
+    Om_ = [];
+    for omega=omega_matrices'
+        o = readmatrix(fullfile(omega_dir, omega.name)) * 0.01;
+        Om_ = [Om_; o];
+    end
+
     % Read CSV of current covariance matrices
-    disp('reducing vals for computation purposes');
+    % disp('reducing vals for computation purposes');
     cov_dir = './misdp_data/inverse_covariance_matrices/';
     cov_matrices = dir(fullfile(cov_dir, '*.csv'));
-    Om_ = [];
+    Um_ = [];
     for cov=cov_matrices'
-        o = readmatrix(fullfile(cov_dir, cov.name)) * 0.01;
-        Om_ = [Om_; o];
+        u = readmatrix(fullfile(cov_dir, cov.name)) * 0.01;
+        Um_ = [Um_; u];
     end
     
     Om_size = size(o);
@@ -88,7 +98,7 @@ function [A, PI] = MISDP_new_copy(ne)
 
     F = [F, schur >= 0];
 
-    F = [F, kron(A, eye(s)) * Om_ == delta];
+    F = [F, kron(A, eye(s)) * Om_ + Um_ == delta];
 
 
     F = [F, A*ones(n,1) == ones(n,1)];
