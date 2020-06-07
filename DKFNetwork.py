@@ -42,30 +42,15 @@ class DKFNetwork:
     """
     Simulation Operations
     """
-    def step_through_sim_wrapper(self, timestep, input, opt,
-                                 L=10, fail_int=None, fail_sequence=None,
-                                 single_node_fail=False,
-                                 base=False, noise_mult=1):
+    def step(self, timestep, input, opt, fail_node,
+             failure=False, base=False, L=10, noise_mult=1):
         nodes = nx.get_node_attributes(self.network, 'node')
-        failure = False
         i = timestep
         ins = input
 
-        if fail_int is not None or fail_sequence is not None:
-            if fail_int is not None:
-                if i in fail_int:
-                    failure = True
-                    fail_node = self.apply_failure(i, mult=noise_mult,
-                                                   single_node_fail=single_node_fail)
-            else:
-                if i in fail_sequence:
-                    failure = True
-                    fail_node = self.apply_failure(i, fail=fail_sequence[i],
-                                                   single_node_fail=single_node_fail)
-
         """
-        True Target Update With Inputs
-        """
+       True Target Update With Inputs
+       """
         for t, target in enumerate(self.targets):
             new_input = deepcopy(ins[t])
             next_state = target.get_next_state(input=ins[t])
@@ -96,7 +81,7 @@ class DKFNetwork:
             if opt == 'agent':
                 self.do_agent_opt(fail_node)
             elif opt == 'team':
-                self.do_team_opt()
+                self.do_team_opt(fail_node)
             elif opt == 'greedy':
                 self.do_greedy_opt(fail_node)
 
@@ -115,7 +100,6 @@ class DKFNetwork:
             if new_coords:
                 for id, n in nodes.items():
                     n.update_position(new_coords[id])
-            failure = False
 
         """
         Run Consensus
@@ -165,13 +149,37 @@ class DKFNetwork:
         self.adjacencies[i] = self.adjacency_matrix()
         self.weighted_adjacencies[i] = self.weighted_adjacency_matrix()
 
+    def step_through_sim_wrapper(self, timestep, input, opt='agent',
+                                 L=10, fail_int=None, fail_sequence=None,
+                                 single_node_fail=False,
+                                 base=False, noise_mult=1):
+        failure = False
+        i = timestep
+        ins = input
+
+        fail_node = None
+        if fail_int is not None or fail_sequence is not None:
+            if fail_int is not None:
+                if i in fail_int:
+                    failure = True
+                    fail_node = self.apply_failure(i, mult=noise_mult,
+                                                   single_node_fail=single_node_fail)
+            else:
+                if i in fail_sequence:
+                    failure = True
+                    fail_node = self.apply_failure(i, fail=fail_sequence[i],
+                                                   single_node_fail=single_node_fail)
+
+        self.step(i, ins, opt, fail_node,
+                  failure=failure, base=base, L=L, noise_mult=noise_mult)
+
     # TODO: measurements param not needed
     def step_through(self, inputs, measurements=None,
                      opt='agent', L=10, fail_int=None, fail_sequence=None,
                      single_node_fail=False,
                      base=False, noise_mult=1):
-        nodes = nx.get_node_attributes(self.network, 'node')
 
+        fail_node = None
         failure = False
         for i, ins in inputs.items():
             if fail_int is not None or fail_sequence is not None:
@@ -184,107 +192,9 @@ class DKFNetwork:
                         failure = True
                         fail_node = self.apply_failure(i, fail=fail_sequence[i], single_node_fail=single_node_fail)
 
-            """
-            True Target Update With Inputs
-            """
-            for t, target in enumerate(self.targets):
-                new_input = deepcopy(ins[t])
-                next_state = target.get_next_state(input=ins[t])
-                new_input = check_oob(next_state, new_input)
-                target.next_state(input=new_input)
-
-            """
-            Local Target Estimation
-            """
-            for id, n in nodes.items():
-                n.predict(len(nodes))
-                ms = n.get_measurements(self.targets)
-                if failure:
-                    ms = [m + np.random.random(m.shape) * noise_mult for m in ms]
-                n.update(ms)
-                n.update_trackers(i)
-
-            """
-            Init Consensus
-            """
-            for id, n in nodes.items():
-                n.init_consensus()
-
-            """
-            Do Optimization and Formation Synthesis
-            """
-            if failure and not base:
-                if opt == 'agent':
-                    self.do_agent_opt(fail_node)
-                elif opt == 'team':
-                    self.do_team_opt()
-                elif opt == 'greedy':
-                    self.do_greedy_opt(fail_node)
-
-                # Random strategy
-                else:
-                    self.do_random_opt(fail_node)
-
-                # Formation Synthesis
-                current_coords = {nid: n.position for nid, n in nodes.items()}
-                fov = {nid: n.fov for nid, n in nodes.items()}
-                Rs = {nid: n.R for nid, n in nodes.items()}
-
-                new_coords, sq = generate_coords(self.adjacency_matrix(),
-                                                 current_coords, fov, Rs)
-                self.surveillance_quality[i] = sq
-                if new_coords:
-                    for id, n in nodes.items():
-                        n.update_position(new_coords[id])
-                failure = False
-
-            """
-            Run Consensus
-            """
-            for l in range(L):
-                neighbor_weights = {}
-                neighbor_omegas = {}
-                neighbor_qs = {}
-
-                for id, n in nodes.items():
-                    weights = []
-                    omegas = []
-                    qs = []
-                    n_weights = nx.get_node_attributes(self.network,
-                                                      'weights')[id]
-                    for neighbor in self.network.neighbors(id):
-                        n_node = nx.get_node_attributes(self.network,
-                                                        'node')[neighbor]
-                        weights.append(n_weights[neighbor])
-                        omegas.append(n_node.omega)
-                        qs.append(n_node.qs)
-                    neighbor_weights[id] = weights
-                    neighbor_omegas[id] = omegas
-                    neighbor_qs[id] = qs
-
-                for id, n in nodes.items():
-                    n.consensus_filter(neighbor_omegas[id],
-                                       neighbor_qs[id],
-                                       neighbor_weights[id])
-
-            for id, n in nodes.items():
-                n.intermediate_cov_update()
-
-            """
-            After Consensus Update
-            """
-            for id, n in nodes.items():
-                n.after_consensus_update(len(nodes))
-
-            for id, n in nodes.items():
-                n.update_trackers(i, pre_consensus=False)
-
-            trace_covs = self.get_trace_covariances()
-            self.max_trace_cov[i] = max(trace_covs)
-            self.mean_trace_cov[i] = np.mean(trace_covs)
-            self.errors[i] = self.calc_errors(self.targets)
-            self.adjacencies[i] = self.adjacency_matrix()
-            self.weighted_adjacencies[i] = self.weighted_adjacency_matrix()
+            self.step(i, ins, opt, fail_node,
+                      failure=failure, base=base, L=L, noise_mult=noise_mult)
+            failure = False
 
     def apply_failure(self, i, fail=None, mult=1, single_node_fail=False):
         nodes = nx.get_node_attributes(self.network, 'node')
@@ -337,18 +247,23 @@ class DKFNetwork:
         nx.set_node_attributes(self.network, nodes, 'node')
         nx.set_node_attributes(self.network, new_weights, 'weights')
 
-    def do_team_opt(self):
+    def do_team_opt(self, failed_node):
         nodes = nx.get_node_attributes(self.network, 'node')
         current_weights = nx.get_node_attributes(self.network, 'weights')
 
         cov_data = [n.full_cov_prediction for id, n in nodes.items()]
         omega_data = [n.omega for id, n in nodes.items()]
 
-        new_config, new_weights = team_opt2(self.adjacency_matrix(),
-                                            current_weights,
-                                            cov_data,
-                                            omega_data)
         # new_config, new_weights = team_opt(self.adjacency_matrix(),
+        #                                     current_weights,
+        #                                     cov_data,
+        #                                     omega_data)
+        new_config, new_weights = team_opt_iter(self.adjacency_matrix(),
+                                                current_weights,
+                                                cov_data,
+                                                omega_data,
+                                                failed_node)
+        # new_config, new_weights = team_opt_matlab(self.adjacency_matrix(),
         #                                     current_weights,
         #                                     cov_data,
         #                                     omega_data)

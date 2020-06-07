@@ -68,8 +68,8 @@ class FilterNodeTests(TestCase):
     #     assert node0_pred_full_state is not None
     #     assert node0_pred_full_cov is not None
     #
-    #     assert_raises(AssertionError, assert_array_equal,
-    #                   node0_target_curr_pos, node0_target_new_pos)
+    #     # assert_raises(AssertionError, assert_array_equal,
+    #     #               node0_target_curr_pos, node0_target_new_pos)
     #
     #     assert_array_equal(node0_target_new_pos, node0_pred_pos)
     #
@@ -260,7 +260,7 @@ class FilterNodeTests(TestCase):
     #                     }
     #     self.network.step_through(inputs, measurements=measurements)
     #     self.network.save_estimates('~')
-
+    #
     # def test_10_step_with_failure_agent(self):
     #     print('step with failure - agent')
     #

@@ -182,58 +182,62 @@ for noise in range(len(noise_mult)):
 
 print('plot')
 # Plot Targets
-est = pd.read_csv('4_nodes_test/0_base/estimates.csv')
-robot_pos = pd.read_csv('4_nodes_test/0_base/robot_positions.csv')
-colors = ['red', 'blue', 'green', 'orange']
-for i in [5, 10, 15, 20, 24]:
-    ax = plt.axes()
-    rs = robot_pos[robot_pos['time'] == i]
-    for t in range(num_targets):
-        df = pd.read_csv('4_nodes_test/0_base/target_{t}_positions.csv'.format(t=t))
-        tmp = df.loc[i - 5 + 1: i + 2]
+for opt in ['agent', 'team', 'greedy', 'random']:
+    est = pd.read_csv('4_nodes_test/0_{opt}/estimates.csv'.format(opt=opt))
+    robot_pos = pd.read_csv('4_nodes_test/0_{opt}/robot_positions.csv'.format(opt=opt))
+    colors = ['red', 'blue', 'green', 'orange']
+    for i in [5, 10, 15, 20, 24]:
+        ax = plt.axes()
+        rs = robot_pos[robot_pos['time'] == i]
+        for t in range(num_targets):
+            df = pd.read_csv('4_nodes_test/0_{opt}/target_{t}_positions.csv'.format(opt=opt, t=t))
+            tmp = df.loc[i - 5 + 1: i + 2]
 
-        plt.plot(tmp['x'].values, tmp['y'].values, '+',
-                 label="True Target {t}".format(t=t), alpha=0.8, color=colors[t])
+            plt.plot(tmp['x'].values, tmp['y'].values, '+',
+                     label="True Target {t}".format(t=t), alpha=0.8, color=colors[t])
 
-        e = est[est['target'] == t]
-        e = e.groupby('time').agg({'x': 'mean', 'y': 'mean'}).reset_index()
-        e = e[(e['time'] >= i - 5) & (e['time'] <= i+1)]
-        plt.plot(e['x'].values, e['y'].values, '--',
-                 label="Estimate {t}".format(t=t), alpha=0.5, color=colors[t])
+            e = est[est['target'] == t]
+            e = e.groupby('time').agg({'x': 'mean', 'y': 'mean'}).reset_index()
+            e = e[(e['time'] >= i - 5) & (e['time'] <= i+1)]
+            plt.plot(e['x'].values, e['y'].values, '--',
+                     label="Estimate {t}".format(t=t), alpha=0.5, color=colors[t])
 
-    plt.scatter(rs['x'].values, rs['y'].values, color='black', marker='x')
+        plt.scatter(rs['x'].values, rs['y'].values, color='black', marker='x')
 
-    # Plot Adjacencies
-    edge_list = []
-    new_A = []
-    topology_file = '4_nodes_test/0_base/topologies/{i}.csv'.format(i=i)
-    with open(topology_file, 'r') as f:
-        readCSV = csv.reader(f, delimiter=',')
-        for row in readCSV:
-            data = list(map(float, row))
-            new_A.append(data)
-    new_A = np.array(new_A)
-    num_drones = new_A.shape[0]
-    for n in range(num_drones):
-        for o in range(n+1, num_drones):
-            if new_A[n, o] == 1:
-                n_pos = rs[rs['node_id'] == n]
-                o_pos = rs[rs['node_id'] == o]
+        # Plot Adjacencies
+        edge_list = []
+        new_A = []
+        topology_file = '4_nodes_test/0_{opt}/topologies/{i}.csv'.format(opt=opt, i=i)
+        with open(topology_file, 'r') as f:
+            readCSV = csv.reader(f, delimiter=',')
+            for row in readCSV:
+                data = list(map(float, row))
+                new_A.append(data)
+        new_A = np.array(new_A)
+        num_drones = new_A.shape[0]
+        for n in range(num_drones):
+            for o in range(n+1, num_drones):
+                if new_A[n, o] == 1:
+                    n_pos = rs[rs['node_id'] == n]
+                    o_pos = rs[rs['node_id'] == o]
 
-                xl = [n_pos['x'].values[0], o_pos['x'].values[0]]
-                yl = [n_pos['y'].values[0], o_pos['y'].values[0]]
-                plt.plot(xl, yl, color='gray', alpha=0.5)
+                    xl = [n_pos['x'].values[0], o_pos['x'].values[0]]
+                    yl = [n_pos['y'].values[0], o_pos['y'].values[0]]
+                    plt.plot(xl, yl, color='gray', alpha=0.5)
 
-        # Plot FOV
-        tmp_rs = rs[rs['node_id'] == n]
-        p = plt.Circle((tmp_rs['x'].values[0], tmp_rs['y'].values[0]), tmp_rs['fov_radius'].values[0], alpha=0.1)
-        ax.add_patch(p)
+            # Plot FOV
+            tmp_rs = rs[rs['node_id'] == n]
+            p = plt.Circle((tmp_rs['x'].values[0], tmp_rs['y'].values[0]), tmp_rs['fov_radius'].values[0], alpha=0.1)
+            ax.add_patch(p)
 
-    plt.xlim([-50, 50])
-    plt.ylim([-50, 50])
-    plt.legend()
-    plt.savefig('4_nodes_test/0_base/overhead/{i}.png'.format(i=i))
-    plt.clf()
+        plt.xlim([-50, 50])
+        plt.ylim([-50, 50])
+        plt.legend()
+        plt.savefig('4_nodes_test/0_{opt}/overhead/{i}.png'.format(opt=opt, i=i))
+        plt.clf()
+
+
+### PLOT METRICS
 
 # Plot Coverage Quality
 for opt in ['agent', 'team', 'greedy', 'random']:
