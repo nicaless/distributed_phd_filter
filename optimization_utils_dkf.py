@@ -368,16 +368,21 @@ def team_opt_iter(adj_mat, current_weights, covariance_matrices, omegas,
     # Get 3 possible new adj_mats
     i = 0
     j = ne
-    # TODO: start with failed node and wrap around 
     while i < 3:
         while j > 0:
             for x in range(i, n):
                 for y in range(x+1, n):
-                    if adj_mat[x, y] == 1:
+                    fnode = x + failed_node
+                    fnode = fnode - n if fnode >= n else fnode
+
+                    nnode = y + failed_node
+                    nnode = nnode - n if nnode >= n else nnode
+
+                    if adj_mat[fnode, nnode] == 1:
                         continue
                     a = deepcopy(adj_mat)
-                    a[x, y] = 1
-                    a[y, x] = 1
+                    a[fnode, nnode] = 1
+                    a[nnode, fnode] = 1
                     pos_adj_mat.append(a)
             j = j - 1
         i = i + 1
@@ -475,8 +480,9 @@ def team_opt_iter(adj_mat, current_weights, covariance_matrices, omegas,
         if problem_status not in ['integer optimal', 'optimal']:
             return adj_mat, current_weights
 
-        print('is inverse')
-        print(np.linalg.det(np.dot(delta_bar.value, Pbar.value)))
+        detI = np.linalg.det(np.dot(delta_bar.value, Pbar.value))
+        if abs(detI - 1) > .1:
+            print('not inverse')
 
         if best_sol_obj is None:
             best_sol_obj = obj
@@ -489,6 +495,7 @@ def team_opt_iter(adj_mat, current_weights, covariance_matrices, omegas,
                 best_A = A
 
     if best_A is None:
+        print('no values for new weights')
         return adj_mat, current_weights
 
     new_config = best_sol
