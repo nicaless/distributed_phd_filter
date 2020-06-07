@@ -108,8 +108,8 @@ For Loop for all Simulations
 """
 saved_fail_sequence = None
 for noise in range(len(noise_mult)):
-    for opt in ['base', 'agent', 'team', 'greedy', 'random']:
-    # for opt in ['base']:
+    # for opt in ['base', 'agent', 'team', 'greedy', 'random']:
+    for opt in ['base', 'team']:
         if opt == 'team':
             # Clear Out Old MISDP Data
             mydir = 'misdp_data/inverse_covariance_matrices'

@@ -98,6 +98,7 @@ function [A, PI] = MISDP_new_copy(ne)
 
     F = [F, schur >= 0];
 
+    %F = [F, kron(A, eye(s)) * Om_ == delta];
     F = [F, kron(A, eye(s)) * Om_ + Um_ == delta];
 
 
