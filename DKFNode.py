@@ -1,6 +1,5 @@
 from copy import deepcopy
 import math
-from numba import jit, njit, cuda
 import numpy as np
 from operator import attrgetter
 from scipy.spatial.distance import mahalanobis

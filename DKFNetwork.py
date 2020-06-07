@@ -1,6 +1,5 @@
 import math
 import networkx as nx
-from numba import jit, njit, cuda
 import numpy as np
 from operator import attrgetter
 import pandas as pd
@@ -8,7 +7,6 @@ import platform
 import scipy
 from scipy.spatial.distance import mahalanobis
 
-from ospa import *
 from target import Target
 
 from optimization_utils_dkf import *

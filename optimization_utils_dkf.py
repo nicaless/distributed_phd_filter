@@ -76,7 +76,7 @@ def agent_opt(adj_mat, current_weights, covariance_data, ne=1, failed_node=None)
     problem.solve(verbose=0, solver='mosek')
     problem_status = problem.status
     print('status: {s}'.format(s=problem_status))
-    if problem_status != 'integer optimal':
+    if problem_status not in ['integer optimal', 'optimal']:
         return adj_mat, current_weights
 
     new_config = np.zeros(adj_mat.shape)
@@ -290,7 +290,7 @@ def team_opt(adj_mat, current_weights, covariance_matrices, omegas, ne=1):
     obj = sol['obj']
     problem_status = problem.status
     print('status: {s}'.format(s=problem_status))
-    if problem_status != 'integer optimal':
+    if problem_status not in ['integer optimal', 'optimal']:
         return adj_mat, current_weights
 
     # print(np.linalg.inv(delta_bar.value) - Pbar.value)
@@ -438,15 +438,15 @@ def team_opt_iter(adj_mat, current_weights, covariance_matrices, omegas,
             problem.add_constraint(abs(delta_array[start:end, :] - delta_list[i]) <= tol)
 
         # Setting Additional Constraint such that delta_bar and Pbar elements in schur variable (with some tolerance)
-        # problem.add_constraint(abs(schur[0:p_size, 0:p_size] - Pbar) <= tol)
-        # problem.add_constraint(abs(schur[p_size:, p_size:] - delta_bar) <= tol)
-        # problem.add_constraint(schur[0:p_size, p_size:] == np.eye(p_size))
-        # problem.add_constraint(schur[p_size:, 0:p_size] == np.eye(p_size))
+        problem.add_constraint(abs(schur[0:p_size, 0:p_size] - Pbar) <= tol)
+        problem.add_constraint(abs(schur[p_size:, p_size:] - delta_bar) <= tol)
+        problem.add_constraint(schur[0:p_size, p_size:] == np.eye(p_size))
+        problem.add_constraint(schur[p_size:, 0:p_size] == np.eye(p_size))
 
         # Schur constraint
-        # problem.add_constraint(schur >= 0)
-        problem.add_constraint(((Pbar & Ibar) //
-                               (Ibar & delta_bar)) >> 0)
+        problem.add_constraint(schur >= 0)
+        # problem.add_constraint(((Pbar & Ibar) //
+        #                        (Ibar & delta_bar)).hermitianized >> 0)
 
         # Kron constraint
         problem.add_constraint(pic.kron(A, I) * cov_array_param +
@@ -474,7 +474,7 @@ def team_opt_iter(adj_mat, current_weights, covariance_matrices, omegas,
         #     abs(PI - adj_mat) ** 2 <= edge_mod_limit)  # Constraint 9
 
         sol = problem.solve(verbose=0, solver='mosek')
-        obj = sol['obj']
+        obj = sol.value
         problem_status = problem.status
         print('status: {s}'.format(s=problem_status))
         if problem_status not in ['integer optimal', 'optimal']:
