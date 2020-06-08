@@ -367,24 +367,26 @@ def team_opt_iter(adj_mat, current_weights, covariance_matrices, omegas,
     pos_adj_mat = []
     # Get 3 possible new adj_mats
     i = 0
-    j = ne
     while i < 3:
-        while j > 0:
-            for x in range(i, n):
-                for y in range(x+1, n):
-                    fnode = x + failed_node
-                    fnode = fnode - n if fnode >= n else fnode
+        j = ne
+        for x in range(i, n):
+            for y in range(x+1, n):
+                fnode = x + failed_node
+                fnode = fnode - n if fnode >= n else fnode
 
-                    nnode = y + failed_node
-                    nnode = nnode - n if nnode >= n else nnode
+                nnode = y + failed_node
+                nnode = nnode - n if nnode >= n else nnode
 
-                    if adj_mat[fnode, nnode] == 1:
-                        continue
-                    a = deepcopy(adj_mat)
-                    a[fnode, nnode] = 1
-                    a[nnode, fnode] = 1
-                    pos_adj_mat.append(a)
-            j = j - 1
+                if adj_mat[fnode, nnode] == 1:
+                    continue
+                a = deepcopy(adj_mat)
+                a[fnode, nnode] = 1
+                a[nnode, fnode] = 1
+                pos_adj_mat.append(a)
+
+                j = j - 1
+                if j == 0:
+                    break
         i = i + 1
 
     best_sol_obj = None
