@@ -5,6 +5,7 @@ import math
 import numpy as np
 import os
 import picos as pic
+from picos.solvers import SolverError
 import platform
 from scipy.linalg import block_diag
 
@@ -387,8 +388,11 @@ def team_opt_iter(adj_mat, current_weights, covariance_matrices, omegas,
                 j = j - 1
                 if j == 0:
                     break
+        if j == 0:
+            break
         i = i + 1
 
+    print(len(pos_adj_mat))
     best_sol_obj = None
     best_sol = None
     best_A = None
@@ -475,26 +479,30 @@ def team_opt_iter(adj_mat, current_weights, covariance_matrices, omegas,
         # problem.add_constraint(
         #     abs(PI - adj_mat) ** 2 <= edge_mod_limit)  # Constraint 9
 
-        sol = problem.solve(verbose=0, solver='mosek')
-        obj = sol.value
-        problem_status = problem.status
-        print('status: {s}'.format(s=problem_status))
-        if problem_status not in ['integer optimal', 'optimal']:
-            return adj_mat, current_weights
+        try:
+            sol = problem.solve(verbose=0, solver='mosek')
+            obj = sol.value
+            problem_status = problem.status
+            print('status: {s}'.format(s=problem_status))
+            if problem_status not in ['integer optimal', 'optimal']:
+                return adj_mat, current_weights
 
-        detI = np.linalg.det(np.dot(delta_bar.value, Pbar.value))
-        if abs(detI - 1) > .1:
-            print('not inverse')
+            detI = np.linalg.det(np.dot(delta_bar.value, Pbar.value))
+            if abs(detI - 1) > .1:
+                print('not inverse')
 
-        if best_sol_obj is None:
-            best_sol_obj = obj
-            best_sol = pi
-            best_A = A
-        else:
-            if obj < best_sol_obj:
+            if best_sol_obj is None:
                 best_sol_obj = obj
                 best_sol = pi
                 best_A = A
+            else:
+                if obj < best_sol_obj:
+                    best_sol_obj = obj
+                    best_sol = pi
+                    best_A = A
+        except SolverError as err:
+            print('solver error {e}'.format(e=err))
+            return pi, current_weights
 
     if best_A is None:
         print('no values for new weights')
