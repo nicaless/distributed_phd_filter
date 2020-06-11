@@ -51,10 +51,10 @@ if not os.path.exists(run_name):
 """
 Create Targets
 """
-t1 = Target(init_state=np.array([[25], [25], [1.], [1.]]))
-t2 = Target(init_state=np.array([[-25], [25], [1.], [1.]]))
-t3 = Target(init_state=np.array([[-25], [-25], [1.], [1.]]))
-t4 = Target(init_state=np.array([[25], [-25], [1.], [1.]]))
+t1 = Target(init_state=np.array([[10], [10], [1.], [1.]]))
+t2 = Target(init_state=np.array([[-10], [10], [1.], [1.]]))
+t3 = Target(init_state=np.array([[-10], [-10], [1.], [1.]]))
+t4 = Target(init_state=np.array([[10], [-10], [1.], [1.]]))
 targets = [t1, t2, t3, t4]
 # targets = []
 # for t in range(num_targets):
