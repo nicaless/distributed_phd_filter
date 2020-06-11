@@ -13,7 +13,7 @@ from optimization_utils_dkf import *
 from reconfig_utils_dkf import *
 
 
-DEFAULT_BBOX = np.array([(-50, 50), (-50, 50), (10, 100)])
+DEFAULT_BBOX = np.array([(-30, 30), (-30, 30), (10, 100)])
 
 
 class DKFNetwork:

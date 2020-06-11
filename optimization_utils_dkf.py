@@ -388,8 +388,8 @@ def team_opt_iter(adj_mat, current_weights, covariance_matrices, omegas,
                 j = j - 1
                 if j == 0:
                     break
-        if j == 0:
-            break
+            if j == 0:
+                break
         i = i + 1
 
     print(len(pos_adj_mat))
@@ -420,6 +420,7 @@ def team_opt_iter(adj_mat, current_weights, covariance_matrices, omegas,
         Ibar = pic.new_param('Ibar', np.eye(p_size))
         cov_array_param = pic.new_param('covs', cov_array)
         inv_cov_array_param = pic.new_param('inv_covs', inv_cov_array)
+        PI = pic.new_param('PI', pi)
 
         # Set Objective
         problem.set_objective('min', beta * pic.trace(Pbar))
@@ -444,15 +445,15 @@ def team_opt_iter(adj_mat, current_weights, covariance_matrices, omegas,
             problem.add_constraint(abs(delta_array[start:end, :] - delta_list[i]) <= tol)
 
         # Setting Additional Constraint such that delta_bar and Pbar elements in schur variable (with some tolerance)
-        problem.add_constraint(abs(schur[0:p_size, 0:p_size] - Pbar) <= tol)
-        problem.add_constraint(abs(schur[p_size:, p_size:] - delta_bar) <= tol)
-        problem.add_constraint(schur[0:p_size, p_size:] == np.eye(p_size))
-        problem.add_constraint(schur[p_size:, 0:p_size] == np.eye(p_size))
+        # problem.add_constraint(abs(schur[0:p_size, 0:p_size] - Pbar) <= tol)
+        # problem.add_constraint(abs(schur[p_size:, p_size:] - delta_bar) <= tol)
+        # problem.add_constraint(schur[0:p_size, p_size:] == np.eye(p_size))
+        # problem.add_constraint(schur[p_size:, 0:p_size] == np.eye(p_size))
 
         # Schur constraint
-        problem.add_constraint(schur >= 0)
-        # problem.add_constraint(((Pbar & Ibar) //
-        #                        (Ibar & delta_bar)).hermitianized >> 0)
+        # problem.add_constraint(schur >= 0)
+        problem.add_constraint(((Pbar & Ibar) //
+                               (Ibar & delta_bar)).hermitianized >> 0)
 
         # Kron constraint
         problem.add_constraint(pic.kron(A, I) * cov_array_param +
@@ -467,14 +468,15 @@ def team_opt_iter(adj_mat, current_weights, covariance_matrices, omegas,
         problem.add_constraint((beta * np.dot(np.ones(n).T, np.ones(n))) +
                                (1 - mu) * np.eye(n) >= A)  # Constraint 2
 
-        # for i in range(n):
-        #     problem.add_constraint(A[i, i] > 0)  # Constraint 6
-        #     for j in range(n):
-        #         if i == j:
-        #             problem.add_constraint(PI[i, j] == 1.0)  # Constraint 3
-        #         else:
-        #             problem.add_constraint(A[i, j] > 0)  # Constraint 7
-        #             problem.add_constraint(A[i, j] <= PI[i, j])  # Constraint 8
+        for i in range(n):
+            problem.add_constraint(A[i, i] > 0)  # Constraint 6
+            for j in range(n):
+                if i == j:
+                    continue
+                    # problem.add_constraint(PI[i, j] == 1.0)  # Constraint 3
+                else:
+                    problem.add_constraint(A[i, j] > 0)  # Constraint 7
+                    problem.add_constraint(A[i, j] <= PI[i, j])  # Constraint 8
 
         # problem.add_constraint(
         #     abs(PI - adj_mat) ** 2 <= edge_mod_limit)  # Constraint 9
