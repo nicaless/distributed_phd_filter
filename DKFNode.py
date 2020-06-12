@@ -72,7 +72,7 @@ class DKFNode:
         self.region = [(x - self.fov, x + self.fov),
                        (y - self.fov, y + self.fov)]
 
-    def predict(self, N):
+    def predict(self, N, inputs=None):
         """
         Makes prediction for all targets
         :return:
@@ -83,15 +83,22 @@ class DKFNode:
         # Set R for All Targets then get measurement and create new full state array
         all_states = None
         all_covs = None
+        all_inputs = None
         predicted_pos = []
         for p in range(len(all_targets)):
+            if inputs is not None:
+                all_inputs = inputs[p] if all_inputs is None else \
+                    np.concatenate((all_inputs, inputs[p]))
             all_states = all_targets[p].state if all_states is None else \
                 np.concatenate((all_states, all_targets[p].state))
 
             all_covs = all_targets[p].state_cov if all_covs is None else \
                 block_diag(all_covs, all_targets[p].state_cov)
 
-            all_targets[p].next_state()
+            if inputs is not None:
+                all_targets[p].next_state(input=inputs[p])
+            else:
+                all_targets[p].next_state()
             predicted_pos.append(all_targets[p].state)
 
         self.predicted_pos = predicted_pos
@@ -105,7 +112,10 @@ class DKFNode:
             B = p.B if B is None else block_diag(B, p.B)
 
         # Predict Full State
-        full_prediction = np.dot(A, all_states)  # 42d
+        if inputs is None:
+            full_prediction = np.dot(A, all_states)  # 42d
+        else:
+            full_prediction = np.dot(A, all_states) + np.dot(B, all_inputs)  # 42d
         Q = np.eye(all_states.shape[0])  # no noise
         full_cov = np.dot(A, np.dot(N * all_covs, A.T)) + N * Q  # 42a
 

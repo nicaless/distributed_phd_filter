@@ -41,7 +41,7 @@ class DKFNetwork:
     Simulation Operations
     """
     def step(self, timestep, input, opt, fail_node,
-             failure=False, base=False, L=10, noise_mult=1):
+             failure=False, base=False, L=10, noise_mult=1, known_input=False):
         nodes = nx.get_node_attributes(self.network, 'node')
         i = timestep
         ins = input
@@ -49,17 +49,22 @@ class DKFNetwork:
         """
        True Target Update With Inputs
        """
+        next_input = []
         for t, target in enumerate(self.targets):
             new_input = deepcopy(ins[t])
             next_state = target.get_next_state(input=ins[t])
             new_input = check_oob(next_state, new_input)
             target.next_state(input=new_input)
+            next_input.append(new_input)
 
         """
         Local Target Estimation
         """
         for id, n in nodes.items():
-            n.predict(len(nodes))
+            if known_input:
+                n.predict(len(nodes))
+            else:
+                n.predict(len(nodes), inputs=next_input)
             ms = n.get_measurements(self.targets)
             if failure:
                 ms = [m + np.random.random(m.shape) * noise_mult for m in ms]
@@ -150,7 +155,7 @@ class DKFNetwork:
     def step_through_sim_wrapper(self, timestep, input, opt='agent',
                                  L=10, fail_int=None, fail_sequence=None,
                                  single_node_fail=False,
-                                 base=False, noise_mult=1):
+                                 base=False, noise_mult=1, known_input=False):
         failure = False
         i = timestep
         ins = input
@@ -169,13 +174,13 @@ class DKFNetwork:
                                                    single_node_fail=single_node_fail)
 
         self.step(i, ins, opt, fail_node,
-                  failure=failure, base=base, L=L, noise_mult=noise_mult)
+                  failure=failure, base=base, L=L, noise_mult=noise_mult, known_input=known_input)
 
     # TODO: measurements param not needed
     def step_through(self, inputs, measurements=None,
                      opt='agent', L=10, fail_int=None, fail_sequence=None,
                      single_node_fail=False,
-                     base=False, noise_mult=1):
+                     base=False, noise_mult=1, known_input=False):
 
         fail_node = None
         failure = False
@@ -191,7 +196,7 @@ class DKFNetwork:
                         fail_node = self.apply_failure(i, fail=fail_sequence[i], single_node_fail=single_node_fail)
 
             self.step(i, ins, opt, fail_node,
-                      failure=failure, base=base, L=L, noise_mult=noise_mult)
+                      failure=failure, base=base, L=L, noise_mult=noise_mult, known_input=known_input)
             failure = False
 
     def apply_failure(self, i, fail=None, mult=1, single_node_fail=False):
