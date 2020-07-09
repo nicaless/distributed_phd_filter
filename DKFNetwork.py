@@ -261,7 +261,7 @@ class DKFNetwork:
         #                                     current_weights,
         #                                     cov_data,
         #                                     omega_data)
-        new_config, new_weights = team_opt_iter(self.adjacency_matrix(),
+        new_config, new_weights = team_opt_bnb(self.adjacency_matrix(),
                                                 current_weights,
                                                 cov_data,
                                                 omega_data,
