@@ -738,7 +738,7 @@ def team_opt_sdp(adj_mat, cov_array, inv_cov_array, s, edge_decisions, ne=1):
     sol = problem.solve(verbose=0, solver='mosek')
     obj = sol.value
 
-    return obj, problem, A
+    return obj, problem, A, PI
 
 
 class BBTreeNode():
@@ -787,9 +787,9 @@ class BBTreeNode():
         cov_array = self.cov_array
         inv_cov_array = self.inv_cov_array
         s = self.s
-        obj, problem, A = team_opt_sdp(adj_mat, cov_array, inv_cov_array, s, self.edge_decisions, ne=self.ne)
+        obj, problem, A, PI = team_opt_sdp(adj_mat, cov_array, inv_cov_array, s, self.edge_decisions, ne=self.ne)
         self.solved_problem = A
-        return obj, problem, A
+        return obj, problem, A, PI
 
     def check_integrals(self, pi):
         y = (abs(pi - 1) <= 1e-2).flatten()
@@ -817,17 +817,21 @@ class BBTreeNode():
         bestres = 1e20  # a big arbitrary initial best objective value
         bestnode = root  # initialize bestnode to the root
 
-        res, node, A = root.buildSolveProblem()
+        res, problem, A, PI = root.buildSolveProblem()
+        print("Initial Solution: ", res)
+        print(PI)
+        print(A)
         heap = [(res, next(counter), root)]
 
-        A = None
         nodecount = 0
         while len(heap) > 0:
             nodecount += 1  # for statistics
             print("Heap Size: ", len(heap))
             _, _, node = heappop(heap)
-            obj, problem, A = node.buildSolveProblem()
+            obj, problem, A, PI = node.buildSolveProblem()
             print("Result: ", obj)
+            print(PI)
+            print(A)
             if problem.status in ['integer optimal', 'optimal']:
                 if obj > bestres - 1e-3:  # even the relaxed problem sucks. forget about this branch then
                     print("Relaxed Problem Stinks. Killing this branch.")
@@ -856,19 +860,19 @@ class BBTreeNode():
                         # using counter to avoid possible comparisons between nodes. It tie breaks
                         heappush(heap, (res, next(counter), new_node))
         print("Nodes searched: ", nodecount)
-        return bestres, bestnode, A
+        return bestres, bestnode, A, PI
 
 
 def team_opt_bnb(adj_mat, current_weights, covariance_matrices, omegas, failed_node, ne=1):
     edge_decisions, curr_edge_decisions = team_opt_bnb_enum_edge_heuristic(failed_node, adj_mat)
     root = BBTreeNode(edge_decisions, curr_edge_decisions, adj_mat, current_weights, covariance_matrices, omegas, ne=ne)
-    bestres, bestnode, A = root.bbsolve()
+    bestres, bestnode, A, PI = root.bbsolve()
     print("best solution value: ", bestres)
 
     if A is None:
         return adj_mat, current_weights
 
-    new_config = bestnode.pi
+    new_config = PI
 
     n = adj_mat.shape[0]
     new_weights = {}
