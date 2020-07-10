@@ -882,9 +882,8 @@ def team_opt_bnb(adj_mat, current_weights, covariance_matrices, omegas, failed_n
     if A is None:
         return adj_mat, current_weights
 
-    new_config = PI
-
     n = adj_mat.shape[0]
+    new_config = np.zeros(adj_mat.shape)
     new_weights = {}
     for i in range(n):
         new_weights[i] = {}
@@ -894,8 +893,11 @@ def team_opt_bnb(adj_mat, current_weights, covariance_matrices, omegas, failed_n
         if nw == 0:
             nw = 0.1
         new_weights[i][i] = nw
+        new_config[i, i] = 1
         for j in range(i + 1, n):
-            if round(new_config[i, j]) == 1:
+            if round(PI[i, j].value) == 1:
+                new_config[i, j] = round(PI[i, j].value)
+                new_config[j, i] = round(PI[j, i].value)
                 nw = A[i, j].value
                 if nw == 0:
                     nw = 0.1
@@ -903,4 +905,3 @@ def team_opt_bnb(adj_mat, current_weights, covariance_matrices, omegas, failed_n
                 new_weights[j][i] = nw
     print(new_config)
     return new_config, new_weights
-
