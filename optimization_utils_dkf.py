@@ -833,6 +833,9 @@ class BBTreeNode():
         print(A)
         heap = [(res, next(counter), root)]
 
+        bestPI = PI
+        bestA = A
+
         nodecount = 0
         while len(heap) > 0:
             nodecount += 1  # for statistics
@@ -850,17 +853,20 @@ class BBTreeNode():
                     print("New Best Integral solution.")
                     bestres = obj
                     bestnode = node
+                    bestPI = PI
+                    bestA = A
 
                 # otherwise, we're unsure if this branch holds promise.
                 # Maybe it can't actually achieve this lower bound. So branch into it
                 else:
+                    print("Branching")
                     changed_edges = 0
                     next_edge = None
-                    for e, d in self.edge_decisions.items():
+                    for e, d in node.edge_decisions.items():
                         if e is None:
                             next_edge = e
                             break
-                        if self.edge_decisions[e] != self.curr_edge_decisions[e]:
+                        if node.edge_decisions[e] != self.curr_edge_decisions[e]:
                             changed_edges += 1
                     if changed_edges >= self.ne:
                         continue
@@ -870,7 +876,7 @@ class BBTreeNode():
                         # using counter to avoid possible comparisons between nodes. It tie breaks
                         heappush(heap, (res, next(counter), new_node))
         print("Nodes searched: ", nodecount)
-        return bestres, bestnode, A, PI
+        return bestres, bestnode, bestA, bestPI
 
 
 def team_opt_bnb(adj_mat, current_weights, covariance_matrices, omegas, failed_node, ne=1):
