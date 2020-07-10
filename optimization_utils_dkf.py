@@ -863,7 +863,7 @@ class BBTreeNode():
                     changed_edges = 0
                     next_edge = None
                     for e, d in node.edge_decisions.items():
-                        if e is None:
+                        if d is None:
                             next_edge = e
                             break
                         if node.edge_decisions[e] != self.curr_edge_decisions[e]:
