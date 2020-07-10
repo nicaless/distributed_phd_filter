@@ -792,9 +792,19 @@ class BBTreeNode():
         return obj, problem, A, PI
 
     def check_integrals(self, pi):
-        y = (abs(pi - 1) <= 1e-2).flatten()
-        z = (abs(pi - 0) <= 1e-2).flatten()
-        return all([y[i] or z[i] for i in range(len(y))])
+        n = self.adj_mat.shape[0]
+        for i in range(n):
+            for j in range(n):
+                if i == j:
+                    if pi[i, j].value != 1.0:
+                        return True
+                else:
+                    x = pi[i, j].value
+                    y = (abs(x - 1) <= 1e-2)
+                    z = (abs(x - 0) <= 1e-2)
+                    if not (y or z):
+                        return False
+        return True
 
     def branch(self, next_edge):
         children = []
@@ -836,7 +846,7 @@ class BBTreeNode():
                 if obj > bestres - 1e-3:  # even the relaxed problem sucks. forget about this branch then
                     print("Relaxed Problem Stinks. Killing this branch.")
                     pass
-                elif self.check_integrals(problem.PI.value):  #if a valid solution then this is the new best
+                elif self.check_integrals(PI):  #if a valid solution then this is the new best
                     print("New Best Integral solution.")
                     bestres = obj
                     bestnode = node
