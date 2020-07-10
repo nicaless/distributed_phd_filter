@@ -743,7 +743,7 @@ def team_opt_sdp(adj_mat, cov_array, inv_cov_array, s, edge_decisions, ne=1):
 
 class BBTreeNode():
     def __init__(self, edge_decisions, curr_edge_decisions, adj_mat, current_weights, covariance_matrices, omegas, ne=1):
-        n = adj_mat.size[0]
+        n = adj_mat.shape[0]
         s = covariance_matrices[0].shape[0]
 
         # Reducing Magnitude if necessary
