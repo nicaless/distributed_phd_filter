@@ -867,6 +867,9 @@ class BBTreeNode():
                             next_edge = e
                             break
                         if node.edge_decisions[e] != self.curr_edge_decisions[e]:
+                            print("edge changed in this node", e)
+                            print("previously", self.curr_edge_decisions[e])
+                            print("now", node.edge_decisions[e])
                             changed_edges += 1
                     if changed_edges > self.ne:
                         continue
