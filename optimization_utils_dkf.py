@@ -871,16 +871,21 @@ class BBTreeNode():
                     if changed_edges >= self.ne:
                         continue
 
+                    print("branch on edge:", next_edge)
                     new_nodes = node.branch(next_edge)
                     for new_node in new_nodes:
                         # using counter to avoid possible comparisons between nodes. It tie breaks
-                        heappush(heap, (res, next(counter), new_node))
+                        heappush(heap, (obj, next(counter), new_node))
         print("Nodes searched: ", nodecount)
         return bestres, bestnode, bestA, bestPI
 
 
 def team_opt_bnb(adj_mat, current_weights, covariance_matrices, omegas, failed_node, ne=1):
     edge_decisions, curr_edge_decisions = team_opt_bnb_enum_edge_heuristic(failed_node, adj_mat)
+    print('edge_decisions')
+    print(edge_decisions)
+    print('curr_edge_decisions')
+    print(curr_edge_decisions)
     root = BBTreeNode(edge_decisions, curr_edge_decisions, adj_mat, current_weights, covariance_matrices, omegas, ne=ne)
     bestres, bestnode, A, PI = root.bbsolve()
     print("best solution value: ", bestres)
