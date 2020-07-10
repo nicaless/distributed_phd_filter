@@ -638,7 +638,7 @@ def team_opt_sdp(adj_mat, cov_array, inv_cov_array, s, edge_decisions, ne=1):
     n = adj_mat.shape[0]
     beta = 1 / n
     # tol = 0.00001
-    tol = 0.1
+    tol = 0.01
     p_size = n * s
     edge_mod_limit = ne * 2
 
@@ -792,9 +792,9 @@ class BBTreeNode():
         return obj, problem, A
 
     def check_integrals(self, pi):
-        # TODO:
-        pass
-        # return all([abs(v.value - 1) <= 1e-3 or abs(v.value - 0) <= 1e-3 for v in self.bool_vars])
+        y = (abs(pi - 1) <= 1e-2).flatten()
+        z = (abs(pi - 0) <= 1e-2).flatten()
+        return all([y[i] or z[i] for i in range(len(y))])
 
     def branch(self, next_edge):
         children = []
