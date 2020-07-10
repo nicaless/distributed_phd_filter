@@ -537,6 +537,55 @@ def team_opt_iter(adj_mat, current_weights, covariance_matrices, omegas,
 
 # Begin Branch and Bound Implementation of Team Optimization Problem
 
+def team_opt_bnb_enum_edge_heuristic(failed_node, adj_mat):
+    edge_decisions = {}
+    curr_edge_decisions = {}
+
+    neighbor_edges = []
+    non_neighbor_edges = []
+    other_paired_edges = []
+    other_unpaired_edges = []
+    for i in range(adj_mat.shape[0]):
+        for j in range(i, adj_mat.shape[0]):
+            if adj_mat[i, j] == 1:
+                curr_edge_decisions[(i, j)] = 1
+                if i == failed_node:
+                    neighbor_edges.append((i, j))
+                else:
+                    other_paired_edges.append((i, j))
+            else:
+                curr_edge_decisions[(i, j)] = 0
+                if i == failed_node:
+                    non_neighbor_edges.append((i, j))
+                else:
+                    other_unpaired_edges.append((i, j))
+
+    # Add Non Neighbor Edges
+    for e in non_neighbor_edges:
+        edge_decisions[e] = None
+
+    # Add Neighbor's Non Neighbor Edges
+    for e in neighbor_edges:
+        for o in other_unpaired_edges:
+            if e[0] in o:
+                edge_decisions[o] = None
+
+    # Add remaining unpaired edges
+    for e in other_unpaired_edges:
+        if e not in edge_decisions.keys():
+            edge_decisions[e] = None
+
+    # Add Neighbor edges
+    for e in neighbor_edges:
+        edge_decisions[e] = None
+
+    # Add Other Paired Edges
+    for e in other_paired_edges:
+        edge_decisions[e] = None
+
+    return edge_decisions, curr_edge_decisions
+
+
 def team_opt_bnb_greedy_heuristic(failed_node, adj_mat, covariance_matrices, tried_nodes, use_max=True):
     det_covs = [np.linalg.det(c) for c in covariance_matrices]
     curr_node = failed_node
@@ -584,13 +633,14 @@ def team_opt_bnb_greedy_heuristic(failed_node, adj_mat, covariance_matrices, tri
     return new_adj_mat, curr_node, best_cov_id
 
 
-def team_opt_mip(pi, adj_mat, cov_array, inv_cov_array, s):
+def team_opt_sdp(adj_mat, cov_array, inv_cov_array, s, edge_decisions, ne=1):
 
     n = adj_mat.shape[0]
     beta = 1 / n
     # tol = 0.00001
     tol = 0.1
     p_size = n * s
+    edge_mod_limit = ne * 2
 
     # Init Problem
     problem = pic.Problem()
@@ -601,6 +651,8 @@ def team_opt_mip(pi, adj_mat, cov_array, inv_cov_array, s):
     mu = problem.add_variable('mu', 1)  # mu is an SDP var
 
     Pbar = problem.add_variable('Pbar', (p_size, p_size))
+
+    PI = problem.add_variable('PI', adj_mat.shape, 'symmetric')
 
     delta_list = []
     for i in range(n):
@@ -615,7 +667,7 @@ def team_opt_mip(pi, adj_mat, cov_array, inv_cov_array, s):
     Ibar = pic.new_param('Ibar', np.eye(p_size))
     cov_array_param = pic.new_param('covs', cov_array)
     inv_cov_array_param = pic.new_param('inv_covs', inv_cov_array)
-    PI = pic.new_param('PI', pi)
+    # PI = pic.new_param('PI', pi)
 
     # Set Objective
     problem.set_objective('min', beta * pic.trace(Pbar))
@@ -661,20 +713,27 @@ def team_opt_mip(pi, adj_mat, cov_array, inv_cov_array, s):
     problem.add_constraint(
         (A * np.ones((n, 1))) == np.ones((n, 1)))  # Constraint 1
     problem.add_constraint((beta * np.dot(np.ones(n).T, np.ones(n))) +
-                           (1 - mu) * np.eye(n) >= A)  # Constraint 2
+                           (1 - mu) * np.eye(n) >> A)  # Constraint 2
 
     for i in range(n):
         problem.add_constraint(A[i, i] > 0)  # Constraint 6
         for j in range(n):
             if i == j:
-                continue
-                # problem.add_constraint(PI[i, j] == 1.0)  # Constraint 3
+                problem.add_constraint(PI[i, j] == 1.0)  # Constraint 3
             else:
                 problem.add_constraint(A[i, j] > 0)  # Constraint 7
                 problem.add_constraint(A[i, j] <= PI[i, j])  # Constraint 8
 
-    # problem.add_constraint(
-    #     abs(PI - adj_mat) ** 2 <= edge_mod_limit)  # Constraint 9
+                problem.add_constraint(PI[i, j] <= 1.0)
+                problem.add_constraint(PI[i, j] >= 0.0)
+
+    for e, d in edge_decisions.items():
+        if d is not None:
+            problem.add_constraint(PI[e[0], e[1]] == d)
+            problem.add_constraint(PI[e[1], e[0]] == d)
+
+    problem.add_constraint(
+        abs(PI - adj_mat) ** 2 <= edge_mod_limit)  # Constraint 9
 
     sol = problem.solve(verbose=0, solver='mosek')
     obj = sol.value
@@ -683,7 +742,7 @@ def team_opt_mip(pi, adj_mat, cov_array, inv_cov_array, s):
 
 
 class BBTreeNode():
-    def __init__(self, pi, tried_nodes, adj_mat, current_weights, covariance_matrices, omegas, failed_node, ne=1):
+    def __init__(self, edge_decisions, curr_edge_decisions, adj_mat, current_weights, covariance_matrices, omegas, ne=1):
         n = adj_mat.size[0]
         s = covariance_matrices[0].shape[0]
 
@@ -707,10 +766,8 @@ class BBTreeNode():
             end = i * s + s
             inv_cov_array[start:end, 0:s] = np.linalg.inv(covariance_matrices[i])
 
-        self.pi = pi
-        self.tried_nodes = tried_nodes
-
-        self.failed_node = failed_node
+        self.edge_decisions = edge_decisions
+        self.curr_edge_decisions = curr_edge_decisions
 
         self.adj_mat = adj_mat
         self.current_weights = current_weights
@@ -726,31 +783,30 @@ class BBTreeNode():
         self.solved_problem = None
 
     def buildSolveProblem(self):
-        pi = self.pi
         adj_mat = self.adj_mat
         cov_array = self.cov_array
         inv_cov_array = self.inv_cov_array
         s = self.s
-        obj, problem, A = team_opt_mip(pi, adj_mat, cov_array, inv_cov_array, s)
+        obj, problem, A = team_opt_sdp(adj_mat, cov_array, inv_cov_array, s, self.edge_decisions, ne=self.ne)
         self.solved_problem = A
         return obj, problem, A
 
-    def branch(self):
+    def check_integrals(self, pi):
+        # TODO:
+        pass
+        # return all([abs(v.value - 1) <= 1e-3 or abs(v.value - 0) <= 1e-3 for v in self.bool_vars])
+
+    def branch(self, next_edge):
         children = []
         for b in [0, 1]:
-            pi, curr_node, best_cov_id = team_opt_bnb_greedy_heuristic(self.failed_node,
-                                                                       self.adj_mat,
-                                                                       self.covariance_matrices,
-                                                                       self.tried_nodes,
-                                                                       use_max=b==0)
-            self.tried_nodes.append(best_cov_id)
-            n1 = BBTreeNode(pi,
-                            self.tried_nodes,  # inherit parent's tried nodes
+            edge_decisions = deepcopy(self.edge_decisions)
+            edge_decisions[next_edge] = b
+            n1 = BBTreeNode(edge_decisions,
+                            self.curr_edge_decisions,
                             self.adj_mat,
                             self.current_weights,
                             self.covariance_matrices,
                             self.omegas,
-                            curr_node,
                             ne=self.ne)
             children.append(n1)
         return children
@@ -761,7 +817,7 @@ class BBTreeNode():
         bestres = 1e20  # a big arbitrary initial best objective value
         bestnode = root  # initialize bestnode to the root
 
-        res = root.buildSolveProblem()
+        res, node, A = root.buildSolveProblem()
         heap = [(res, next(counter), root)]
 
         A = None
@@ -776,7 +832,7 @@ class BBTreeNode():
                 if obj > bestres - 1e-3:  # even the relaxed problem sucks. forget about this branch then
                     print("Relaxed Problem Stinks. Killing this branch.")
                     pass
-                elif problem.status in ['integer optimal']:  #if a valid solution then this is the new best
+                elif self.check_integrals(problem.PI.value):  #if a valid solution then this is the new best
                     print("New Best Integral solution.")
                     bestres = obj
                     bestnode = node
@@ -784,7 +840,18 @@ class BBTreeNode():
                 # otherwise, we're unsure if this branch holds promise.
                 # Maybe it can't actually achieve this lower bound. So branch into it
                 else:
-                    new_nodes = node.branch()
+                    changed_edges = 0
+                    next_edge = None
+                    for e, d in self.edge_decisions.items():
+                        if e is None:
+                            next_edge = e
+                            break
+                        if self.edge_decisions[e] != self.curr_edge_decisions[e]:
+                            changed_edges += 1
+                    if changed_edges >= self.ne:
+                        continue
+
+                    new_nodes = node.branch(next_edge)
                     for new_node in new_nodes:
                         # using counter to avoid possible comparisons between nodes. It tie breaks
                         heappush(heap, (res, next(counter), new_node))
@@ -793,9 +860,8 @@ class BBTreeNode():
 
 
 def team_opt_bnb(adj_mat, current_weights, covariance_matrices, omegas, failed_node, ne=1):
-    pi, curr_node, best_cov_id = team_opt_bnb_greedy_heuristic(failed_node, adj_mat, covariance_matrices, [])
-    tried_nodes = [best_cov_id]
-    root = BBTreeNode(pi, tried_nodes, adj_mat, current_weights, covariance_matrices, omegas, failed_node, ne=ne)
+    edge_decisions, curr_edge_decisions = team_opt_bnb_enum_edge_heuristic(failed_node, adj_mat)
+    root = BBTreeNode(edge_decisions, curr_edge_decisions, adj_mat, current_weights, covariance_matrices, omegas, ne=ne)
     bestres, bestnode, A = root.bbsolve()
     print("best solution value: ", bestres)
 
