@@ -546,7 +546,7 @@ def team_opt_bnb_enum_edge_heuristic(failed_node, adj_mat):
     other_paired_edges = []
     other_unpaired_edges = []
     for i in range(adj_mat.shape[0]):
-        for j in range(i, adj_mat.shape[0]):
+        for j in range(i+1, adj_mat.shape[0]):
             if adj_mat[i, j] == 1:
                 curr_edge_decisions[(i, j)] = 1
                 if i == failed_node:
