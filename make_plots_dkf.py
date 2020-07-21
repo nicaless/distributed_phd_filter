@@ -19,7 +19,8 @@ mpl.rcParams.update(params)
 
 
 dir = '7_nodes_4_targets_trial2'
-dir_team = '7_nodes_4_targets_team_only_trial2'
+# dir_team = '7_nodes_4_targets_team_only_trial2'
+dir_team = '7_nodes_4_targets_bnb'
 num_nodes = 7
 
 total_time_steps = 50

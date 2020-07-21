@@ -575,13 +575,13 @@ def team_opt_bnb_enum_edge_heuristic(failed_node, adj_mat):
         if e not in edge_decisions.keys():
             edge_decisions[e] = None
 
-    # Add Neighbor edges
-    for e in neighbor_edges:
-        edge_decisions[e] = None
-
-    # Add Other Paired Edges
-    for e in other_paired_edges:
-        edge_decisions[e] = None
+    # # Add Neighbor edges
+    # for e in neighbor_edges:
+    #     edge_decisions[e] = None
+    #
+    # # Add Other Paired Edges
+    # for e in other_paired_edges:
+    #     edge_decisions[e] = None
 
     return edge_decisions, curr_edge_decisions
 
@@ -715,6 +715,7 @@ def team_opt_sdp(adj_mat, cov_array, inv_cov_array, s, edge_decisions, ne=1):
     problem.add_constraint((beta * np.dot(np.ones(n).T, np.ones(n))) +
                            (1 - mu) * np.eye(n) >> A)  # Constraint 2
 
+    # TODO: add constraints based on previous adj_mat
     for i in range(n):
         problem.add_constraint(A[i, i] > 0)  # Constraint 6
         for j in range(n):
@@ -726,6 +727,9 @@ def team_opt_sdp(adj_mat, cov_array, inv_cov_array, s, edge_decisions, ne=1):
 
                 problem.add_constraint(PI[i, j] <= 1.0)
                 problem.add_constraint(PI[i, j] >= 0.0)
+            if adj_mat[i, j] == 1:
+                problem.add_constraint(PI[i, j] == 1.0)
+                problem.add_constraint(PI[j, i] == 1.0)
 
     for e, d in edge_decisions.items():
         if d is not None:
