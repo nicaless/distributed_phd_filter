@@ -546,7 +546,7 @@ def team_opt_bnb_enum_edge_heuristic(failed_node, adj_mat):
     other_paired_edges = []
     other_unpaired_edges = []
     for i in range(adj_mat.shape[0]):
-        for j in range(i, adj_mat.shape[0]):
+        for j in range(i+1, adj_mat.shape[0]):
             if adj_mat[i, j] == 1:
                 curr_edge_decisions[(i, j)] = 1
                 if i == failed_node:
@@ -739,10 +739,14 @@ def team_opt_sdp(adj_mat, cov_array, inv_cov_array, s, edge_decisions, ne=1):
     problem.add_constraint(
         abs(PI - adj_mat) ** 2 <= edge_mod_limit)  # Constraint 9
 
-    sol = problem.solve(verbose=0, solver='mosek')
-    obj = sol.value
+    try:
+        sol = problem.solve(verbose=0, solver='mosek')
+        obj = sol.value
+    except SolverError as err:
+        print('solver error {e}'.format(e=err))
+        return None, 'solver error', None, None
 
-    return obj, problem, A, PI
+    return obj, problem.status, A, PI
 
 
 class BBTreeNode():
@@ -845,11 +849,13 @@ class BBTreeNode():
             nodecount += 1  # for statistics
             print("Heap Size: ", len(heap))
             _, _, node = heappop(heap)
-            obj, problem, A, PI = node.buildSolveProblem()
+            obj, problem_status, A, PI = node.buildSolveProblem()
             print("Result: ", obj)
             print(PI)
             print(A)
-            if problem.status in ['integer optimal', 'optimal']:
+            if problem_status == 'solver error':
+                continue
+            if problem_status in ['integer optimal', 'optimal']:
                 if obj > bestres - 1e-3:  # even the relaxed problem sucks. forget about this branch then
                     print("Relaxed Problem Stinks. Killing this branch.")
                     pass
