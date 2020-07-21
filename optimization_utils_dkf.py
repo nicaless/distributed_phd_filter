@@ -715,7 +715,6 @@ def team_opt_sdp(adj_mat, cov_array, inv_cov_array, s, edge_decisions, ne=1):
     problem.add_constraint((beta * np.dot(np.ones(n).T, np.ones(n))) +
                            (1 - mu) * np.eye(n) >> A)  # Constraint 2
 
-    # TODO: add constraints based on previous adj_mat
     for i in range(n):
         problem.add_constraint(A[i, i] > 0)  # Constraint 6
         for j in range(n):
@@ -725,11 +724,12 @@ def team_opt_sdp(adj_mat, cov_array, inv_cov_array, s, edge_decisions, ne=1):
                 problem.add_constraint(A[i, j] > 0)  # Constraint 7
                 problem.add_constraint(A[i, j] <= PI[i, j])  # Constraint 8
 
-                problem.add_constraint(PI[i, j] <= 1.0)
-                problem.add_constraint(PI[i, j] >= 0.0)
             if adj_mat[i, j] == 1:
                 problem.add_constraint(PI[i, j] == 1.0)
                 problem.add_constraint(PI[j, i] == 1.0)
+            else:
+                problem.add_constraint(PI[i, j] <= 1.0)
+                problem.add_constraint(PI[i, j] >= 0.0)
 
     for e, d in edge_decisions.items():
         if d is not None:
