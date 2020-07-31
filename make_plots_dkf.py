@@ -20,7 +20,8 @@ mpl.rcParams.update(params)
 
 dir = '7_nodes_4_targets_trial2'
 # dir_team = '7_nodes_4_targets_team_only_trial2'
-dir_team = '7_nodes_4_targets_bnb'
+dir_team = '7_nodes_4_targets_bnb_eff'
+dir_team2 = '7_nodes_4_targets_bnb'
 num_nodes = 7
 
 total_time_steps = 50
@@ -709,8 +710,10 @@ for f in range(1, len(fail_int)):
     for i in range(4):
         for opt in ['agent', 'team']:
             if opt == 'team':
-                errors = pd.read_csv('7_nodes_4_targets_team_only_knowninput/{i}_{opt}/errors.csv'.format(i=i, opt=opt))
-                fail_seq = pd.read_csv('7_nodes_4_targets_team_only_knowninput/fail_sequence/_node_list.csv'.format(i=i, opt=opt), header=None)
+                # errors = pd.read_csv('7_nodes_4_targets_team_only_knowninput/{i}_{opt}/errors.csv'.format(i=i, opt=opt))
+                # fail_seq = pd.read_csv('7_nodes_4_targets_team_only_knowninput/fail_sequence/_node_list.csv'.format(i=i, opt=opt), header=None)
+                errors = pd.read_csv('7_nodes_4_targets_bnb_known_input/{i}_{opt}/errors.csv'.format(i=i, opt=opt))
+                fail_seq = pd.read_csv('7_nodes_4_targets_bnb_known_input/fail_sequence/_node_list.csv'.format(i=i, opt=opt),header=None)
             else:
                 errors = pd.read_csv('7_nodes_4_targets_knowninput/{i}_{opt}/errors.csv'.format(i=i, opt=opt))
                 fail_seq = pd.read_csv('7_nodes_4_targets_knowninput/fail_sequence/_node_list.csv'.format(i=i,opt=opt), header=None)
@@ -753,11 +756,18 @@ for f in range(1, len(fail_int)):
     errors_unknown['agent'].append(np.mean(errors_agg['agent']))
     errors_unknown['team'].append(np.mean(errors_agg['team']))
 
-plt.plot(list(range(1, len(fail_int))), np.abs(errors_unknown['agent']), '--', label='ACCG - Unknown Input', color='blue')
-plt.plot(list(range(1, len(fail_int))), np.abs(errors_unknown['team']), '--', label='TCCG - Unknown Input', color='orange')
+# plt.plot(list(range(1, len(fail_int))), np.abs(errors_unknown['agent']), '--', label='ACCG - Unknown Input', color='blue')
+# plt.plot(list(range(1, len(fail_int))), np.abs(errors_unknown['team']), '--', label='TCCG - Unknown Input', color='orange')
+#
+# plt.plot(list(range(1, len(fail_int))), np.abs(errors_known['agent']), linestyle='dotted', label='ACCGK - Known Input', color='blue')
+# plt.plot(list(range(1, len(fail_int))), np.abs(errors_known['team']), linestyle='dotted', label='TCCGK - Known Input', color='orange')
 
-plt.plot(list(range(1, len(fail_int))), np.abs(errors_known['agent']), linestyle='dotted', label='ACCGK - Known Input', color='blue')
-plt.plot(list(range(1, len(fail_int))), np.abs(errors_known['team']), linestyle='dotted', label='TCCGK - Known Input', color='orange')
+plt.plot(list(range(1, len(fail_int))), np.abs(errors_known['agent']), '--', label='ACCG - Unknown Input', color='blue')
+plt.plot(list(range(1, len(fail_int))), np.abs(errors_known['team']), '--', label='TCCG - Unknown Input', color='orange')
+
+plt.plot(list(range(1, len(fail_int))), np.abs(errors_unknown['agent']), linestyle='dotted', label='ACCGK - Known Input', color='blue')
+plt.plot(list(range(1, len(fail_int))), np.abs(errors_unknown['team']), linestyle='dotted', label='TCCGK - Known Input', color='orange')
+
 
 plt.legend(frameon=True, loc=(1.04,0))
 plt.ylabel('Average Estimation Error')
@@ -776,6 +786,8 @@ for f in range(1, len(fail_int)):
             if opt == 'team':
                 errors = pd.read_csv('7_nodes_4_targets_team_only_knowninput/{i}_{opt}/mean_tr_cov.csv'.format(i=i, opt=opt))
                 fail_seq = pd.read_csv('7_nodes_4_targets_team_only_knowninput/fail_sequence/_node_list.csv'.format(i=i, opt=opt), header=None)
+                # errors = pd.read_csv('7_nodes_4_targets_bnb_known_input/{i}_{opt}/mean_tr_cov.csv'.format(i=i, opt=opt))
+                # fail_seq = pd.read_csv('7_nodes_4_targets_bnb_known_input/fail_sequence/_node_list.csv'.format(i=i, opt=opt), header=None)
             else:
                 errors = pd.read_csv('7_nodes_4_targets_knowninput/{i}_{opt}/mean_tr_cov.csv'.format(i=i, opt=opt))
                 fail_seq = pd.read_csv('7_nodes_4_targets_knowninput/fail_sequence/_node_list.csv'.format(i=i,opt=opt), header=None)
@@ -808,11 +820,17 @@ for f in range(1, len(fail_int)):
     errors_unknown['agent'].append(np.mean(errors_agg['agent']))
     errors_unknown['team'].append(np.mean(errors_agg['team']))
 
-plt.plot(list(range(1, len(fail_int))), np.abs(errors_unknown['agent']), '--', label='ACCG - Unknown Input', color='blue')
-plt.plot(list(range(1, len(fail_int))), np.abs(errors_unknown['team']), '--', label='TCCG - Unknown Input', color='orange')
+# plt.plot(list(range(1, len(fail_int))), np.abs(errors_unknown['agent']), '--', label='ACCG - Unknown Input', color='blue')
+# plt.plot(list(range(1, len(fail_int))), np.abs(errors_unknown['team']), '--', label='TCCG - Unknown Input', color='orange')
+#
+# plt.plot(list(range(1, len(fail_int))), np.abs(errors_known['agent']), linestyle='dotted', label='ACCGK - Known Input', color='blue')
+# plt.plot(list(range(1, len(fail_int))), np.abs(errors_known['team']), linestyle='dotted', label='TCCGK - Known Input', color='orange')
 
-plt.plot(list(range(1, len(fail_int))), np.abs(errors_known['agent']), linestyle='dotted', label='ACCGK - Known Input', color='blue')
-plt.plot(list(range(1, len(fail_int))), np.abs(errors_known['team']), linestyle='dotted', label='TCCGK - Known Input', color='orange')
+plt.plot(list(range(1, len(fail_int))), np.abs(errors_known['agent']), '--', label='ACCG - Unknown Input', color='blue')
+plt.plot(list(range(1, len(fail_int))), np.abs(errors_known['team']), '--', label='TCCG - Unknown Input', color='orange')
+
+plt.plot(list(range(1, len(fail_int))), np.abs(errors_unknown['agent']), linestyle='dotted', label='ACCGK - Known Input', color='blue')
+plt.plot(list(range(1, len(fail_int))), np.abs(errors_unknown['team']), linestyle='dotted', label='TCCGK - Known Input', color='orange')
 
 plt.legend(frameon=True, loc=(1.04,0))
 plt.ylabel('Average Tr(P)')

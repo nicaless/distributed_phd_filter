@@ -114,7 +114,8 @@ For Loop for all Simulations
 saved_fail_sequence = None
 for noise in range(len(noise_mult)):
     # for opt in ['base', 'agent', 'greedy']:
-    for opt in ['base', 'team']:
+    # for opt in ['base', 'team']:
+    for opt in ['base']:
         trial_name = run_name + '/{noise}_{o}'.format(noise=noise,
                                                       o=opt)
         print(trial_name)
@@ -133,7 +134,7 @@ for noise in range(len(noise_mult)):
                                        opt=opt,
                                        fail_int=fail_int,
                                        base=base,
-                                       noise_mult=noise_mult[noise])
+                                       noise_mult=noise_mult[noise], known_input=True)
 
             """
             Save Fail Sequence
@@ -150,7 +151,7 @@ for noise in range(len(noise_mult)):
                                        opt=opt,
                                        fail_int=saved_fail_sequence,
                                        base=base,
-                                       noise_mult=noise_mult[noise])
+                                       noise_mult=noise_mult[noise], known_input=True)
 
         """
         Save Data

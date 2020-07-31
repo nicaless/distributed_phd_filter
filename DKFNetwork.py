@@ -104,6 +104,20 @@ class DKFNetwork:
                 for id, n in nodes.items():
                     n.update_position(new_coords[id])
 
+        if failure and base:
+            # Just get current surveillance quality
+            current_coords = {nid: n.position for nid, n in nodes.items()}
+            fov = {nid: n.fov for nid, n in nodes.items()}
+            Rs = {nid: n.R for nid, n in nodes.items()}
+            # TODO: parametrize these
+            H_default = np.logspace(1, 3, 1000)[0]
+            k = -0.1
+            safe_dist = 10
+            connect_dist = 25
+            _, sq = energyCoverage(self.adjacency_matrix(), current_coords, fov, Rs,
+                                    H_default, k, safe_dist, connect_dist, DEFAULT_BBOX)
+            self.surveillance_quality[i] = sq
+
         """
         Run Consensus
         """

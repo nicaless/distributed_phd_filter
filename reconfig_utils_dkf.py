@@ -88,7 +88,6 @@ def propose(current_coords, delta):
     return propose_coords
 
 
-# TODO: return overall coverage quality
 def energyCoverage(config, propose_coords, fov, Rs,
                    H, k, safe_dist, connect_dist, bbox):
     """
