@@ -116,7 +116,7 @@ class PHDFilterNetwork:
                 if opt == 'agent':
                     self.do_agent_opt(fail_node, how=how)
                 elif opt == 'team':
-                    self.do_team_opt(how=how)
+                    self.do_team_opt(fail_node, how=how)
                 elif opt == 'greedy':
                     self.do_greedy_opt(fail_node, how=how)
 
@@ -272,20 +272,21 @@ class PHDFilterNetwork:
         # new_weights = self.get_metro_weights()
         # nx.set_node_attributes(self.network, new_weights, 'weights')
 
-    def do_team_opt(self, how='geom'):
+    def do_team_opt(self, failed_node, how='geom'):
         nodes = nx.get_node_attributes(self.network, 'node')
 
         min_cardinality, cov_data = self.prep_optimization_data(how=how)
 
         current_weights = nx.get_node_attributes(self.network, 'weights')
 
-        # new_config, new_weights = team_opt(self.adjacency_matrix(),
+        # new_config, new_weights = team_opt_matlab(self.adjacency_matrix(),
         #                                     current_weights,
         #                                     cov_data)
-        new_config, new_weights = team_opt2(self.adjacency_matrix(),
-                                            current_weights,
-                                            cov_data,
-                                            how=how)
+        new_config, new_weights = team_opt_iter(self.adjacency_matrix(),
+                                                current_weights,
+                                                cov_data,
+                                                failed_node,
+                                                how=how)
         print(current_weights)
         print(new_weights)
         G = nx.from_numpy_matrix(new_config)
