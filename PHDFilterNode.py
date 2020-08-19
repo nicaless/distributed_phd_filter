@@ -5,7 +5,7 @@ import numpy as np
 from operator import attrgetter
 from scipy.spatial.distance import mahalanobis
 
-from target import Target
+from target import Target, DEFAULT_H
 
 
 class PHDFilterNode:
@@ -24,7 +24,7 @@ class PHDFilterNode:
 
         self.position = position
         self.region = region
-        self.R = np.eye(2)
+        self.R = np.eye(DEFAULT_H.shape[0])
         self.fov = (region[0][1] - region[0][0]) / 2.0
         area = (region[0][1] - region[0][0]) * (region[1][1] - region[1][0])
         self.clutter_intensity = clutter_rate / area
@@ -118,9 +118,7 @@ class PHDFilterNode:
 
         newgmm = [Target(init_weight=comp.weight * (1.0 - self.detection_probability),
                          init_state=comp.state,
-                         init_cov=comp.state_cov,
-                         dt_1=comp.dt_1,
-                         dt_2=comp.dt_2)
+                         init_cov=comp.state_cov)
                   for comp in self.predicted_targets]
 
         for m in measurements:
@@ -138,9 +136,7 @@ class PHDFilterNode:
                 newcomp_state_cov = comp.state_cov
                 newgmmpartial.append(Target(init_weight=newcomp_weight,
                                             init_state=newcomp_state,
-                                            init_cov=newcomp_state_cov,
-                                            dt_1=comp.dt_1,
-                                            dt_2=comp.dt_2
+                                            init_cov=newcomp_state_cov
                                             ))
                 weightsum += newcomp_weight
 
@@ -215,8 +211,7 @@ class PHDFilterNode:
             newcomp = Target(init_weight=newcomp_weight,
                              init_state=newcomp_state,
                              init_cov=newcomp_cov,
-                             dt_1=weightiest.dt_1,
-                             dt_2=weightiest.dt_2)
+                             A=weightiest.A)
 
             newgmm.append(newcomp)
 
