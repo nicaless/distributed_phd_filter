@@ -79,7 +79,12 @@ class SimGenerator:
                                                            init_cov, size=1)
                 init_state = np.array([[sample[0][0]], [sample[0][1]],
                                        [sample[0][2]], [sample[0][3]]])
-                new_target = Target(init_state=init_state, dt_2=-1)
+
+                default_a = np.array([[1, 0, 1, 0],
+                                      [0, 1, 0, -1],
+                                      [0, 0, 1, 0],
+                                      [0, 0, 0, 1]])
+                new_target = Target(init_state=init_state, A=default_a)
             elif corner == 2:
                 draw_state = np.array([[self.region[0][1] - 10],
                                        [self.region[1][1] - 10],
@@ -89,8 +94,11 @@ class SimGenerator:
                                                        init_cov, size=1)
                 init_state = np.array([[sample[0][0]], [sample[0][1]],
                                        [sample[0][2]], [sample[0][3]]])
-                new_target = Target(init_state=init_state,
-                                    dt_1=-1, dt_2=-1)
+                default_a = np.array([[1, 0, -1, 0],
+                                      [0, 1, 0, -1],
+                                      [0, 0, 1, 0],
+                                      [0, 0, 0, 1]])
+                new_target = Target(init_state=init_state, A=default_a)
             else:
                 draw_state = np.array([[self.region[0][1] - 10],
                                        [self.region[1][0] + 10],
@@ -100,7 +108,11 @@ class SimGenerator:
                                                            init_cov, size=1)
                 init_state = np.array([[sample[0][0]], [sample[0][1]],
                                        [sample[0][2]], [sample[0][3]]])
-                new_target = Target(init_state=init_state, dt_1=-1)
+                default_a = np.array([[1, 0, -1, 0],
+                                      [0, 1, 0, 1],
+                                      [0, 0, 1, 0],
+                                      [0, 0, 0, 1]])
+                new_target = Target(init_state=init_state, A=default_a)
 
             next_timestep_targets.append(new_target)
             true_positions.append(new_target.get_measurement())
