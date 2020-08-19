@@ -69,13 +69,25 @@ corner0 = Target(init_state=np.array([[region[0][0] + 10],
                                       [0.1], [0.1]]))
 corner1 = Target(init_state=np.array([[region[0][0] + 10],
                                       [region[1][1] - 10],
-                                      [0.1], [0.1]]), dt_2=-1)
+                                      [0.1], [0.1]]),
+                 A=np.array([[1, 0, 1, 0],
+                             [0, 1, 0, -1],
+                             [0, 0, 1, 0],
+                             [0, 0, 0, 1]]))
 corner2 = Target(init_state=np.array([[region[0][1] - 10],
                                       [region[1][1] - 10],
-                                      [0.1], [0.1]]), dt_1=-1, dt_2=-1)
+                                      [0.1], [0.1]]),
+                 A=np.array([[1, 0, -1, 0],
+                             [0, 1, 0, -1],
+                             [0, 0, 1, 0],
+                             [0, 0, 0, 1]]))
 corner3 = Target(init_state=np.array([[region[0][1] - 10],
                                       [region[1][0] + 10],
-                                      [0.1], [0.1]]), dt_1=-1)
+                                      [0.1], [0.1]]),
+                 A=np.array([[1, 0, -1, 0],
+                             [0, 1, 0, 1],
+                             [0, 0, 1, 0],
+                             [0, 0, 0, 1]]))
 birthgmm = [corner0, corner1, corner2, corner3]
 
 
