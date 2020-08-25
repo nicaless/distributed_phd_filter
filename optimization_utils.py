@@ -470,9 +470,10 @@ def team_opt_iter(adj_mat, current_weights, covariance_matrices,
                 if problem_status not in ['integer optimal', 'optimal']:
                     return adj_mat, current_weights
 
-                detI = np.linalg.det(np.dot(delta_bar.value, Pbar.value))
-                if abs(detI - 1) > .1:
-                    print('not inverse')
+                if how == 'geom':
+                    detI = np.linalg.det(np.dot(delta_bar.value, Pbar.value))
+                    if abs(detI - 1) > .1:
+                        print('not inverse')
 
                 if best_sol_obj is None:
                     best_sol_obj = obj
