@@ -915,8 +915,7 @@ class PHDFilterNetwork:
 
         for n, node in nodes.items():
             for t in node.targets:
-                tracks.append(np.array([[t.state[0][0]],
-                                        [t.state[1][0]]]))
+                tracks.append(t.state)
 
         gospa, \
         target_to_track_assigments, \
