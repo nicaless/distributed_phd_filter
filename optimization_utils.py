@@ -77,7 +77,7 @@ def agent_opt(adj_mat, current_weights, covariance_data, ne=1, failed_node=None)
     problem.solve(verbose=0, solver='mosek')
     problem_status = problem.status
     print('status: {s}'.format(s=problem_status))
-    if problem_status != 'integer optimal':
+    if problem_status not in ['integer optimal', 'optimal']:
         return adj_mat, current_weights
 
     new_config = np.zeros(adj_mat.shape)
@@ -375,6 +375,7 @@ def team_opt_iter(adj_mat, current_weights, covariance_matrices,
                 break
         i = i + 1
 
+    print(len(pos_adj_mat))
     best_sol_obj = None
     best_sol = None
     best_A = None
@@ -462,31 +463,31 @@ def team_opt_iter(adj_mat, current_weights, covariance_matrices,
                     problem.add_constraint(
                         A[i, j] <= PI[i, j])  # Constraint 8
 
-            try:
-                sol = problem.solve(verbose=0, solver='mosek')
-                obj = sol.value
-                problem_status = problem.status
-                print('status: {s}'.format(s=problem_status))
-                if problem_status not in ['integer optimal', 'optimal']:
-                    return adj_mat, current_weights
+        try:
+            sol = problem.solve(verbose=0, solver='mosek')
+            obj = sol.value
+            problem_status = problem.status
+            print('status: {s}'.format(s=problem_status))
+            if problem_status not in ['integer optimal', 'optimal']:
+                return adj_mat, current_weights
 
-                if how == 'geom':
-                    detI = np.linalg.det(np.dot(delta_bar.value, Pbar.value))
-                    if abs(detI - 1) > .1:
-                        print('not inverse')
+            if how == 'geom':
+                detI = np.linalg.det(np.dot(delta_bar.value, Pbar.value))
+                if abs(detI - 1) > .1:
+                    print('not inverse')
 
-                if best_sol_obj is None:
+            if best_sol_obj is None:
+                best_sol_obj = obj
+                best_sol = pi
+                best_A = A
+            else:
+                if obj < best_sol_obj:
                     best_sol_obj = obj
                     best_sol = pi
                     best_A = A
-                else:
-                    if obj < best_sol_obj:
-                        best_sol_obj = obj
-                        best_sol = pi
-                        best_A = A
-            except SolverError as err:
-                print('solver error {e}'.format(e=err))
-                return pi, current_weights
+        except SolverError as err:
+            print('solver error {e}'.format(e=err))
+            return pi, current_weights
 
     if best_A is None:
         print('no values for new weights')
