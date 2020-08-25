@@ -440,6 +440,9 @@ def team_opt_iter(adj_mat, current_weights, covariance_matrices,
             problem.add_constraint(((Pbar & Ibar) //
                                     (Ibar & delta_bar)).hermitianized >> 0)
 
+        # Kron constraint
+        problem.add_constraint(pic.kron(A, I) * cov_array_param == delta_array)
+
         # Set the usual Constraints
         problem.add_constraint(mu >= 0.001)
         problem.add_constraint(mu < 1)
