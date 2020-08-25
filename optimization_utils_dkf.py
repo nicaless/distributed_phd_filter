@@ -63,7 +63,7 @@ def agent_opt(adj_mat, current_weights, covariance_data, ne=1, failed_node=None)
     problem.add_constraint(
         (A * np.ones((n, 1))) == np.ones((n, 1)))  # Constraint 1
     problem.add_constraint((beta * np.dot(np.ones(n).T, np.ones(n))) +
-                           (1 - mu) * np.eye(n) >= A)  # Constraint 2
+                           (1 - mu) * np.eye(n) >> A)  # Constraint 2
 
     for i in range(n):
         problem.add_constraint(A[i, i] > 0)  # Constraint 6
