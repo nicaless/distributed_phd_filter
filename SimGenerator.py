@@ -40,7 +40,7 @@ class SimGenerator:
 
         # Update State for Current Targets
         for target in self.last_timestep_targets:
-            target.next_state()
+            target.next_state(input=np.array([[1], [1]]))
 
             # Check if Target Survives
             current_pos = target.state
