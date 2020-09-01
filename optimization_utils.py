@@ -104,6 +104,137 @@ def agent_opt(adj_mat, current_weights, covariance_data, ne=1, failed_node=None)
     return new_config, new_weights
 
 
+def agent_opt_iter(adj_mat, current_weights, covariance_data, ne=1, failed_node=None):
+    edge_mod_limit = ne * 2
+    n = adj_mat.shape[0]
+    beta = 1 / n
+    node_bin = np.zeros((1, n))
+    if failed_node is not None:
+        node_bin[0][failed_node] = 1
+
+    # Reducing Magnitude if necessary
+    covariance_data = np.nan_to_num(covariance_data)
+    magnitude_covs = [magnitude(cov) for cov in covariance_data]
+    if max(magnitude_covs) > 15:
+        print('rescaling matrix magnitude, magnitude too high')
+        covariance_data = [cov * (10 ** (-1 * max(magnitude_covs)))
+                           for cov in covariance_data]
+
+    pos_adj_mat = []
+    # Get 3 possible new adj_mats
+    i = 0
+    while i < 3:
+        j = ne
+        for x in range(i, n):
+            if x == failed_node:
+                continue
+            fnode = failed_node
+            nnode = x
+
+            if adj_mat[fnode, nnode] == 1:
+                continue
+
+            a = deepcopy(adj_mat)
+            a[fnode, nnode] = 1
+            a[nnode, fnode] = 1
+            pos_adj_mat.append(a)
+
+            j = j - 1
+            if j == 0:
+                break
+        i = i + 1
+
+    print(len(pos_adj_mat))
+    if len(pos_adj_mat) == 0:
+        return adj_mat, current_weights
+
+    best_sol_obj = None
+    best_sol = None
+    best_A = None
+    for pi in pos_adj_mat:
+        # Init Problem
+        problem = pic.Problem()
+
+        # Add Variables
+        A = problem.add_variable('A', adj_mat.shape,
+                                 'symmetric')  # A is an SDP var
+        # PI = problem.add_variable('PI', adj_mat.shape,
+        #                           'binary')  # PI is a binary var
+        PI = pic.new_param('PI', pi)
+        mu = problem.add_variable('mu', 1)  # mu is an SDP var
+
+        # Set Objective
+        problem.set_objective('min',
+                              -1 * node_bin * A * np.array(covariance_data).T)
+
+        # Set Constraints
+        problem.add_constraint(mu >= 0.001)
+        problem.add_constraint(mu < 1)
+        problem.add_constraint(
+            (A * np.ones((n, 1))) == np.ones((n, 1)))  # Constraint 1
+        problem.add_constraint((beta * np.dot(np.ones(n).T, np.ones(n))) +
+                               (1 - mu) * np.eye(n) >> A)  # Constraint 2
+
+        for i in range(n):
+            problem.add_constraint(A[i, i] > 0)  # Constraint 6
+            for j in range(n):
+                if i == j:
+                    # problem.add_constraint(PI[i, j] == 1.0)  # Constraint 3
+                    continue
+                else:
+                    problem.add_constraint(A[i, j] > 0)  # Constraint 7
+                    problem.add_constraint(A[i, j] <= PI[i, j])  # Constraint 8
+
+        problem.add_constraint(
+            abs(PI - adj_mat) ** 2 <= edge_mod_limit)  # Constraint 9
+
+        try:
+            sol = problem.solve(verbose=0, solver='mosek')
+            obj = sol.value
+            problem_status = problem.status
+            print('status: {s}'.format(s=problem_status))
+            if problem_status not in ['integer optimal', 'optimal']:
+                return adj_mat, current_weights
+
+            if best_sol_obj is None:
+                best_sol_obj = obj
+                best_sol = pi
+                best_A = A
+            else:
+                if obj < best_sol_obj:
+                    best_sol_obj = obj
+                    best_sol = pi
+                    best_A = A
+        except SolverError as err:
+            print('solver error {e}'.format(e=err))
+            return pi, current_weights
+
+    if best_A is None:
+        print('no values for new weights')
+        return adj_mat, current_weights
+
+    new_config = best_sol
+    new_weights = {}
+    for i in range(n):
+        new_weights[i] = {}
+
+    A = best_A
+    for i in range(n):
+        nw = A[i, i].value
+        if nw == 0:
+            nw = 0.1
+        new_weights[i][i] = nw
+        for j in range(i + 1, n):
+            if round(new_config[i, j]) == 1:
+                nw = A[i, j].value
+                if nw == 0:
+                    nw = 0.1
+                new_weights[i][j] = nw
+                new_weights[j][i] = nw
+    print(new_config)
+    return new_config, new_weights
+
+
 def team_opt_matlab(adj_mat, current_weights, covariance_matrices, ne=1):
     A = adj_mat
     n = adj_mat.shape[0]
