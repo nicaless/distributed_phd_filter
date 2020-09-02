@@ -78,7 +78,7 @@ class PHDFilterNode:
         # Existing Targets
         updated = [deepcopy(t) for t in self.targets]
         for t in updated:
-            t.next_state()
+            t.next_state(input=np.array([[1], [1]]))
             t.weight = t.weight * self.survival_prob
         keep_updated = [t for t in updated]
 

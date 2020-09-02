@@ -32,7 +32,7 @@ run_name = 'team_iter'
 node_dir_plot = '5_nodes_iter'
 trial_name = node_dir_plot + '/0_arith_greedy'
 # node_list = [5, 6, 7, 10, 12, 15, 20, 25, 30]
-node_list = [7, 10, 12, 15]
+node_list = [7, 10, 15]
 
 
 """
