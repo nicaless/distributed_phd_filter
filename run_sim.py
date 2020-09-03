@@ -43,7 +43,7 @@ x_start = -50 + (100.0 / (num_nodes + 1))  # init x coord of first node
 pos_start = np.array([x_start, 0, 20])  # init x coord for all nodes
 pos_init_dist = np.floor(100.0 / (num_nodes + 1))  # init x dist between nodes
 fov = 20  # radius of FOV
-noise_mult = [3, 3, 3, 3, 3]  # multiplier for added noise at each failure
+noise_mult = [1, 1, 1, 1, 1]  # multiplier for added noise at each failure
 
 
 
@@ -102,9 +102,11 @@ for n in range(num_nodes):
     pos = pos_start + np.array([n*pos_init_dist, 0, 0])
     region = [(pos[0] - fov, pos[0] + fov),
               (pos[1] - fov, pos[1] + fov)]
+    # node_attrs[n] = PHDFilterNode(n, birthgmm,
+    #                               position=pos,
+    #                               region=region)
     node_attrs[n] = PHDFilterNode(n, birthgmm,
-                                  position=pos,
-                                  region=region)
+                                  position=pos)
 
 """
 Create Graph
@@ -135,7 +137,7 @@ run_times = []
 for n in range(len(noise_mult)):
     noise = noise_mult[n]
     for how in ['arith', 'geom']:
-        for opt in ['base', 'agent', 'greedy', 'team', 'random']:
+        for opt in ['base']:
             # if opt == 'team':
             #     mydir = 'misdp_data/inverse_covariance_matrices'
             #     # Clear Out Old MISDP Data

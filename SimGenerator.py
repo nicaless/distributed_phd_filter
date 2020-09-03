@@ -40,7 +40,8 @@ class SimGenerator:
 
         # Update State for Current Targets
         for target in self.last_timestep_targets:
-            target.next_state(input=np.array([[1], [1]]))
+            # target.next_state(input=np.array([[1], [1]]))
+            target.next_state()
 
             # Check if Target Survives
             current_pos = target.state
@@ -62,7 +63,7 @@ class SimGenerator:
             if corner == 0:
                 draw_state = np.array([[self.region[0][0] + 10],
                                        [self.region[1][0] + 10],
-                                       [0.1], [0.1]])
+                                       [1], [1]])
                 init_cov = np.diag((0.01, 0.01, 0.01, 0.01))
                 sample = np.random.multivariate_normal(draw_state.flat,
                                                        init_cov, size=1)
@@ -73,7 +74,7 @@ class SimGenerator:
             elif corner == 1:
                 draw_state = np.array([[self.region[0][0] + 10],
                                        [self.region[1][1] - 10],
-                                       [0.1], [0.1]])
+                                       [1], [1]])
                 init_cov = np.diag((0.01, 0.01, 0.01, 0.01))
                 sample = np.random.multivariate_normal(draw_state.flat,
                                                            init_cov, size=1)
@@ -88,7 +89,7 @@ class SimGenerator:
             elif corner == 2:
                 draw_state = np.array([[self.region[0][1] - 10],
                                        [self.region[1][1] - 10],
-                                       [0.1], [0.1]])
+                                       [1], [1]])
                 init_cov = np.diag((0.01, 0.01, 0.01, 0.01))
                 sample = np.random.multivariate_normal(draw_state.flat,
                                                        init_cov, size=1)
@@ -102,7 +103,7 @@ class SimGenerator:
             else:
                 draw_state = np.array([[self.region[0][1] - 10],
                                        [self.region[1][0] + 10],
-                                       [0.1], [0.1]])
+                                       [1], [1]])
                 init_cov = np.diag((0.01, 0.01, 0.01, 0.01))
                 sample = np.random.multivariate_normal(draw_state.flat,
                                                            init_cov, size=1)

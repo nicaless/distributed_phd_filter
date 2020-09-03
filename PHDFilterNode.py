@@ -118,7 +118,8 @@ class PHDFilterNode:
 
         newgmm = [Target(init_weight=comp.weight * (1.0 - self.detection_probability),
                          init_state=comp.state,
-                         init_cov=comp.state_cov)
+                         init_cov=comp.state_cov,
+                         A=comp.A)
                   for comp in self.predicted_targets]
 
         for m in measurements:
@@ -136,7 +137,8 @@ class PHDFilterNode:
                 newcomp_state_cov = comp.state_cov
                 newgmmpartial.append(Target(init_weight=newcomp_weight,
                                             init_state=newcomp_state,
-                                            init_cov=newcomp_state_cov
+                                            init_cov=newcomp_state_cov,
+                                            A=comp.A
                                             ))
                 weightsum += newcomp_weight
 
@@ -265,7 +267,7 @@ class PHDFilterNode:
                                            for t in self.targets]
             self.consensus_target_covs[i] = [t.state_cov for t in self.targets]
 
-@njit
+# @njit
 def dmvnorm(state, cov, obs):
     """
     Evaluate a multivariate normal, given a state (vector) and covariance (matrix) and a position x (vector) at which to evaluate"

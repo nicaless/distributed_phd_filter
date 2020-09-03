@@ -27,12 +27,12 @@ Params
 """
 # run_name = 'vary_fail_events'
 # run_name = 'single_fail_n_consensus'
-run_name = 'team_iter'
+run_name = '3_nodes_test_iter'
 
-node_dir_plot = '5_nodes_iter'
-trial_name = node_dir_plot + '/0_arith_greedy'
+node_dir_plot = 'test'
+trial_name = node_dir_plot + '/0_arith_base'
 # node_list = [5, 6, 7, 10, 12, 15, 20, 25, 30]
-node_list = [7, 10, 15]
+node_list = [3]
 
 
 """

@@ -145,6 +145,7 @@ class PHDFilterNetwork:
             L = int(max(3.0, len(nodes) / 2.0))
             for l in range(L):
                 self.cardinality_consensus()
+                # TODO: WHAT HAPPENED TO FUSED COMPONENTS, ARE THEY NOT RESAVED TO  NODES?
                 self.fuse_components(how=how)
                 self.rescale_component_weights()
 
@@ -442,7 +443,10 @@ class PHDFilterNetwork:
             old_estimate = np.nansum([t.weight
                                       for t in nodes[node_id].targets])
             new_estimate = self.cardinality[node_id]
-            rescaler = new_estimate / old_estimate
+            if old_estimate == 0:
+                rescaler = 1
+            else:
+                rescaler = new_estimate / old_estimate
             targets = nodes[node_id].targets
             for t in targets:
                 t.weight = rescaler * t.weight
@@ -630,6 +634,10 @@ class PHDFilterNetwork:
                                                    0)
                 sum_alphas = np.sum(fuse_alphas)
 
+                if sum_alphas == 0:
+                    new_states.append(sum_alpha_weighted_states)
+                    new_alphas.append(sum_alphas)
+                    continue
                 new_states.append(sum_alpha_weighted_states / sum_alphas)
                 new_alphas.append(sum_alphas)
 
@@ -933,6 +941,12 @@ class PHDFilterNetwork:
         for n, card in self.cardinality.items():
             squared_error += (card - N) ** 2
             sum_card += card
+
+        if N == 0 and sum_card == 0:
+            return 0
+
+        if N == 0 or sum_card == 0:
+            return squared_error
 
         return squared_error / (N * sum_card)
 
