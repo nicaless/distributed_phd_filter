@@ -220,45 +220,45 @@ class FilterNodeTests(TestCase):
     #     #               merged_weights, reweighted_weights)
     #     assert_array_equal(merged_weights, reweighted_weights)
 
-    def test_sub_step_through(self):
-        print('sub step through manual')
-        self.node_sub.predict()
-        m = self.generator.observations[0]
-        self.node_sub.update(m)
-        self.node_sub.prune()
-        self.node_sub.merge()
-        self.node_sub.reweight()
-        self.node_sub.targets = self.node_sub.reweighted_targets
-
-        states_after_first_iter = [t.state for t in self.node_sub.targets]
-        print('begin second iter')
-        self.node_sub.predict()
-
-        states_new_predict = [t.state for t in self.node_sub.predicted_targets]
-
-        print(states_after_first_iter)
-        print(len(states_after_first_iter))
-        print(states_new_predict)
-        print(len(states_new_predict))
-
-        assert_raises(AssertionError, assert_array_equal,
-                      states_after_first_iter, states_new_predict)
-
-        num_targets_after_second_predict = len(states_new_predict)
-
-        m = self.generator.observations[1]
-        self.node_sub.update(m)
-        self.node_sub.prune()
-        num_targets_before_second_merge = len([t.state for t in
-                                               self.node_sub.pruned_targets])
-        self.node_sub.merge()
-        num_targets_after_second_merge = len([t.state for t in
-                                              self.node_sub.merged_targets])
-
-        assert num_targets_before_second_merge >= num_targets_after_second_merge
-        print(num_targets_after_second_merge,
-              num_targets_after_second_predict)
-        assert num_targets_after_second_merge >= num_targets_after_second_predict
+    # def test_sub_step_through(self):
+    #     print('sub step through manual')
+    #     self.node_sub.predict()
+    #     m = self.generator.observations[0]
+    #     self.node_sub.update(m)
+    #     self.node_sub.prune()
+    #     self.node_sub.merge()
+    #     self.node_sub.reweight()
+    #     self.node_sub.targets = self.node_sub.reweighted_targets
+    #
+    #     states_after_first_iter = [t.state for t in self.node_sub.targets]
+    #     print('begin second iter')
+    #     self.node_sub.predict()
+    #
+    #     states_new_predict = [t.state for t in self.node_sub.predicted_targets]
+    #
+    #     print(states_after_first_iter)
+    #     print(len(states_after_first_iter))
+    #     print(states_new_predict)
+    #     print(len(states_new_predict))
+    #
+    #     assert_raises(AssertionError, assert_array_equal,
+    #                   states_after_first_iter, states_new_predict)
+    #
+    #     num_targets_after_second_predict = len(states_new_predict)
+    #
+    #     m = self.generator.observations[1]
+    #     self.node_sub.update(m)
+    #     self.node_sub.prune()
+    #     num_targets_before_second_merge = len([t.state for t in
+    #                                            self.node_sub.pruned_targets])
+    #     self.node_sub.merge()
+    #     num_targets_after_second_merge = len([t.state for t in
+    #                                           self.node_sub.merged_targets])
+    #
+    #     assert num_targets_before_second_merge >= num_targets_after_second_merge
+    #     print(num_targets_after_second_merge,
+    #           num_targets_after_second_predict)
+    #     assert num_targets_after_second_merge >= num_targets_after_second_predict
 
     # def test_step_through(self):
     #     print('step_through')

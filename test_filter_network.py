@@ -89,13 +89,18 @@ class FilterNodeTests(TestCase):
     #     pass
 
     def test_fuse_geom(self):
-        self.filternetwork.step_through(self.generator.observations[0],
-                                        self.generator.true_positions[0],
+        obs = {i: self.generator.observations[i] for i in range(3)}
+        tp = {i: self.generator.true_positions[i] for i in range(3)}
+        self.filternetwork.step_through(obs,
+                                        tp,
                                         how='geom',
                                         opt='team',
                                         fail_int=[1],
                                         base=True,
                                         noise_mult=1)
+        print(tp)
+        print(self.filternetwork.nmse_card)
+        print(self.filternetwork.gospa)
 
 
 

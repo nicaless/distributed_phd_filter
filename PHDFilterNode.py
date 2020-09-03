@@ -270,7 +270,7 @@ class PHDFilterNode:
                                            for t in self.targets]
             self.consensus_target_covs[i] = [t.state_cov for t in self.targets]
 
-@njit
+# @njit
 def dmvnorm(state, cov, obs):
     """
     Evaluate a multivariate normal, given a state (vector) and covariance (matrix) and a position x (vector) at which to evaluate"

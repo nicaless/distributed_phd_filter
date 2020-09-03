@@ -145,10 +145,12 @@ class PHDFilterNetwork:
             L = int(max(3.0, len(nodes) / 2.0))
             for l in range(L):
                 self.cardinality_consensus()
-                self.fuse_components(how=how)
+                fused_comps = self.fuse_components(how=how)
                 self.rescale_component_weights()
 
             for id, n in nodes.items():
+                # n.targets = fused_comps[id]
+                print(id, len(n.targets))
                 n.update_trackers(i, pre_consensus=False)
 
             trace_covs = self.get_trace_covariances()
@@ -428,11 +430,15 @@ class PHDFilterNetwork:
         self.get_neighbors_comps()
         self.get_comps_to_fuse()
 
+        new_comps = {}
+
         for node_id in list(self.network.nodes()):
             if how == 'geom':
-                self.geometric_fusion(node_id)
+                fused_comps = self.geometric_fusion(node_id)
             else:
-                self.arithmetic_fusion(node_id)
+                fused_comps = self.arithmetic_fusion(node_id)
+            new_comps[node_id] = fused_comps
+        return new_comps
 
     def rescale_component_weights(self):
         nodes = nx.get_node_attributes(self.network, 'node')
@@ -441,7 +447,12 @@ class PHDFilterNetwork:
             old_estimate = np.nansum([t.weight
                                       for t in nodes[node_id].targets])
             new_estimate = self.cardinality[node_id]
-            rescaler = new_estimate / old_estimate
+
+            if old_estimate == 0:
+                rescaler = 1
+            else:
+                rescaler = new_estimate / old_estimate
+
             targets = nodes[node_id].targets
             for t in targets:
                 t.weight = rescaler * t.weight
@@ -628,6 +639,11 @@ class PHDFilterNetwork:
                 sum_alpha_weighted_states = np.sum(fuse_alpha_weighted_states,
                                                    0)
                 sum_alphas = np.sum(fuse_alphas)
+
+                if sum_alphas == 0:
+                    new_states.append(sum_alpha_weighted_states)
+                    new_alphas.append(sum_alphas)
+                    continue
 
                 new_states.append(sum_alpha_weighted_states / sum_alphas)
                 new_alphas.append(sum_alphas)
@@ -933,6 +949,12 @@ class PHDFilterNetwork:
         for n, card in self.cardinality.items():
             squared_error += (card - N) ** 2
             sum_card += card
+
+        if N == 0 and sum_card == 0:
+            return 0
+
+        if N == 0 or sum_card == 0:
+            return squared_error
 
         return squared_error / (N * sum_card)
 

@@ -120,7 +120,7 @@ saved_fail_sequence = None
 for n in range(len(noise_mult)):
     noise = noise_mult[n]
     for how in ['arith', 'geom']:
-        for opt in ['base', 'agent', 'greedy', 'team', 'random']:
+        for opt in ['base']:
             # if opt == 'team':
             #     mydir = 'misdp_data/inverse_covariance_matrices'
             #     # Clear Out Old MISDP Data
