@@ -56,6 +56,9 @@ class PHDFilterNode:
         # reweighted results
         self.reweighted_targets = []
 
+        # TODO: consensus targets (used in fusion step)
+        self.consensus_targets = []
+
         # TRACKERS
         self.observations = {}
         self.node_positions = {}

@@ -11,15 +11,15 @@ from scipy.spatial.distance import mahalanobis
 from ospa import *
 from target import Target
 
-#from optimization_utils import *
-#from reconfig_utils import *
-if platform.system() == 'Linux':
-    print('loading in files with jit')
-    from optimization_utils_jit import *
-    from reconfig_utils_jit import *
-else:
-    from optimization_utils import *
-    from reconfig_utils import *
+from optimization_utils import *
+from reconfig_utils import *
+# if platform.system() == 'Linux':
+#     print('loading in files with jit')
+#     from optimization_utils_jit import *
+#     from reconfig_utils_jit import *
+# else:
+#     from optimization_utils import *
+#     from reconfig_utils import *
 
 
 class PHDFilterNetwork:
@@ -150,7 +150,7 @@ class PHDFilterNetwork:
 
             for id, n in nodes.items():
                 # n.targets = fused_comps[id]
-                print(id, len(n.targets))
+                # print(id, len(n.targets))
                 n.update_trackers(i, pre_consensus=False)
 
             trace_covs = self.get_trace_covariances()
