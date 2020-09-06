@@ -40,8 +40,9 @@ fail_int = list(range(1, total_time_steps, fail_freq))  # time steps at which fa
 x_start = -50 + (100.0 / (num_nodes + 1))  # init x coord of first node
 pos_start = np.array([x_start, 0, 20])  # init x coord for all nodes
 pos_init_dist = np.floor(100.0 / (num_nodes + 1))  # init x dist between nodes
-fov = 20  # radius of FOV
+fov = 40  # radius of FOV
 noise_mult = [3, 3, 3, 3, 3]  # multiplier for added noise at each failure
+# noise_mult = [3]  # multiplier for added noise at each failure
 
 
 
