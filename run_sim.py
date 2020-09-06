@@ -11,6 +11,8 @@ from PHDFilterNode import PHDFilterNode
 from SimGenerator import SimGenerator
 from target import Target
 
+import time
+
 """
 Params
 """
@@ -118,6 +120,7 @@ For Loop for all Simulations
 """
 count_loops = 0
 saved_fail_sequence = None
+run_times = []
 for n in range(len(noise_mult)):
     noise = noise_mult[n]
     for how in ['arith', 'geom']:
@@ -145,6 +148,7 @@ for n in range(len(noise_mult)):
             """
             Run Simulation
             """
+            start_time = time.time()
             base = opt == 'base'
             if how == 'arith' and opt == 'base':
                 filternetwork.step_through(generator.observations,
@@ -178,6 +182,10 @@ for n in range(len(noise_mult)):
             """
             Save Data
             """
+            run_time_seconds = time.time() - start_time
+            run_times.append(
+                {'trial': n, 'how': how, 'opt': opt, 'time': run_time_seconds})
+
             if not os.path.exists(trial_name):
                 os.makedirs(trial_name)
                 os.makedirs(trial_name + '/3ds')
@@ -195,3 +203,6 @@ expected_num_loops = len(noise_mult) * \
                      len(['base', 'agent', 'greedy', 'team', 'random'])
 
 assert count_loops == expected_num_loops
+
+run_times_df = pd.DataFrame(run_times)
+run_times_df.to_csv(run_name + '/run_times.csv')
