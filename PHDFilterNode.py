@@ -12,9 +12,9 @@ class PHDFilterNode:
     def __init__(self,
                  node_id,
                  birthgmm,
-                 prune_thresh=1e-6,
-                 merge_thresh=0.2,
-                 max_comp=100,
+                 prune_thresh=1e-2,
+                 merge_thresh=1,
+                 max_comp=20,
                  clutter_rate=5,
                  # clutter_rate=0,
                  position=np.array([0, 0, 0]),
@@ -134,9 +134,13 @@ class PHDFilterNode:
             weightsum = 0
             for index, comp in enumerate(self.predicted_targets):
                 obs_probability = dmvnorm(nu[index], s[index], m)
-                newcomp_weight = float(comp.weight *
-                                       self.detection_probability *
-                                       obs_probability)
+                if obs_probability > 0:
+                    newcomp_weight = float(comp.weight *
+                                           self.detection_probability)
+                else:
+                    newcomp_weight = float(comp.weight *
+                                           self.detection_probability *
+                                           obs_probability)
                 newcomp_state = comp.state + np.dot(K[index], m - nu[index])
                 newcomp_state_cov = comp.state_cov
                 newgmmpartial.append(Target(init_weight=newcomp_weight,
@@ -175,6 +179,9 @@ class PHDFilterNode:
         return d
 
     def prune(self):
+        # print(max([comp.weight for comp in self.updated_targets]))
+        # print(min([comp.weight for comp in self.updated_targets]))
+        # print(np.unique([comp.weight for comp in self.updated_targets]))
         prunedgmm = list(filter(lambda comp: comp.weight > self.prune_thresh,
                                 self.updated_targets))
         self.pruned_targets = prunedgmm

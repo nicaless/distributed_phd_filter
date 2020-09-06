@@ -27,7 +27,7 @@ class PHDFilterNetwork:
                  nodes,
                  weights,
                  G,
-                 merge_thresh=0.2):
+                 merge_thresh=1):
         self.network = G
         nx.set_node_attributes(self.network, nodes, 'node')
         nx.set_node_attributes(self.network, weights, 'weights')
@@ -116,7 +116,7 @@ class PHDFilterNetwork:
                 if opt == 'agent':
                     self.do_agent_opt(fail_node, how=how)
                 elif opt == 'team':
-                    self.do_team_opt(how=how)
+                    self.do_team_opt(fail_node, how=how)
                 elif opt == 'greedy':
                     self.do_greedy_opt(fail_node, how=how)
 
@@ -257,10 +257,10 @@ class PHDFilterNetwork:
             det_c = np.linalg.det(c)
             covariance_data.append((1/min_cardinality) * det_c)
 
-        new_config, new_weights = agent_opt(self.adjacency_matrix(),
-                                            current_weights,
-                                            covariance_data,
-                                            failed_node=failed_node)
+        new_config, new_weights = agent_opt_iter(self.adjacency_matrix(),
+                                                 current_weights,
+                                                 covariance_data,
+                                                 failed_node=failed_node)
         print(current_weights)
         print(new_weights)
         G = nx.from_numpy_matrix(new_config)
@@ -274,7 +274,7 @@ class PHDFilterNetwork:
         # new_weights = self.get_metro_weights()
         # nx.set_node_attributes(self.network, new_weights, 'weights')
 
-    def do_team_opt(self, how='geom'):
+    def do_team_opt(self, failed_node, how='geom'):
         nodes = nx.get_node_attributes(self.network, 'node')
 
         min_cardinality, cov_data = self.prep_optimization_data(how=how)
@@ -284,10 +284,11 @@ class PHDFilterNetwork:
         # new_config, new_weights = team_opt(self.adjacency_matrix(),
         #                                     current_weights,
         #                                     cov_data)
-        new_config, new_weights = team_opt2(self.adjacency_matrix(),
-                                            current_weights,
-                                            cov_data,
-                                            how=how)
+        new_config, new_weights = team_opt_iter(self.adjacency_matrix(),
+                                                current_weights,
+                                                cov_data,
+                                                failed_node,
+                                                how=how)
         print(current_weights)
         print(new_weights)
         G = nx.from_numpy_matrix(new_config)

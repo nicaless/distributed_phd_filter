@@ -32,7 +32,7 @@ class FilterNodeTests(TestCase):
         super().setUp()
 
         np.random.seed(42)
-        self.N = 20
+        self.N = 30
         self.generator = SimGenerator()
         self.generator.generate(steps=self.N)
         self.generator.plot()
@@ -288,8 +288,16 @@ class FilterNodeTests(TestCase):
         print('step_through sub')
         self.node_sub.step_through(self.generator.observations)
 
+        # for i in range(10, self.N):
+        #     print(i)
+        #     assert len(self.node_sub.preconsensus_positions[i]) > 4
+
         # Plot Target Positions Estimates and Truths
         for i, pos in self.node_sub.preconsensus_positions.items():
+            ax = plt.axes()
+            plt.xlim((-50, 50))
+            plt.ylim((-50, 50))
+
             x = []
             y = []
             for p in pos:
@@ -304,6 +312,13 @@ class FilterNodeTests(TestCase):
                 y.append(p[1])
             plt.scatter(x, y, label='truths', alpha=0.5, s=10)
 
+            # Plot FOV
+            p = plt.Circle((self.node_sub.position[0],
+                            self.node_sub.position[1]),
+                           25, alpha=0.1)
+            ax.add_patch(p)
+
             plt.legend()
-            plt.savefig('results/{i}.png'.format(i=i))
+            plt.savefig('results_node/{i}.png'.format(i=i))
             plt.clf()
+

@@ -77,6 +77,58 @@ class FilterNodeTests(TestCase):
         super().tearDown()
 
     def test_local_phd(self):
+        print('checking local phds of individual nodes')
+        nodes = nx.get_node_attributes(self.filternetwork.network, 'node')
+
+        for id, n in nodes.items():
+            n.step_through(self.generator.observations)
+
+        # for i in range(10, self.N):
+        #     for id, n in nodes.items():
+        #         print(id, i)
+        #         assert len(n.preconsensus_positions[i]) > 4
+
+        # Plot all node estimates
+        for i, pos in self.generator.observations.items():
+            ax = plt.axes()
+            plt.xlim((-50, 50))
+            plt.ylim((-50, 50))
+
+            node_estimates = {}
+            x = []
+            y = []
+            for p in pos:
+                x.append(p[0])
+                y.append(p[1])
+            node_estimates[-1] = {'x': x, 'y': y}
+
+            for id, n in nodes.items():
+                node_sub = n
+                x = []
+                y = []
+                for ests in node_sub.preconsensus_positions[i]:
+                    x.append(ests[0][0])
+                    y.append(ests[1][0])
+                node_estimates[id] = {'x': x, 'y': y}
+
+            for key, vals in node_estimates.items():
+                if key == -1:
+                    plt.scatter(vals['x'], vals['y'], label=key, alpha=0.5, s=20)
+                else:
+                    plt.scatter(vals['x'], vals['y'], label=key, alpha=0.5, s=10)
+
+            # Plot FOV
+            for id, n in nodes.items():
+                p = plt.Circle((n.node_positions[i][0],
+                                n.node_positions[i][1]),
+                               20, alpha=0.1)
+                ax.add_patch(p)
+
+            plt.legend()
+            plt.savefig('results_network/{i}.png'.format(i=i))
+            plt.clf()
+
+    def test_failure(self):
         pass
 
     def test_fuse_components(self):
