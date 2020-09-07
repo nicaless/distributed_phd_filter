@@ -142,6 +142,8 @@ def agent_opt_iter(adj_mat, current_weights, covariance_data, ne=1, failed_node=
             if j == 0:
                 break
         i = i + 1
+        if j == 0:
+            break
 
     print(len(pos_adj_mat))
     if len(pos_adj_mat) == 0:
@@ -504,6 +506,8 @@ def team_opt_iter(adj_mat, current_weights, covariance_matrices,
             if j == 0:
                 break
         i = i + 1
+        if j == 0:
+            break
 
     print(len(pos_adj_mat))
     if len(pos_adj_mat) == 0:
