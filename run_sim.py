@@ -197,6 +197,9 @@ for n in range(len(noise_mult)):
             filternetwork.save_topologies(trial_name + '/topologies')
             count_loops += 1
 
+            run_times_df = pd.DataFrame(run_times)
+            run_times_df.to_csv(run_name + '/run_times.csv')
+
 
 expected_num_loops = len(noise_mult) * \
                      len(['arith', 'geom']) * \
