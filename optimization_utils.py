@@ -104,6 +104,10 @@ def agent_opt(adj_mat, current_weights, covariance_data, ne=1, failed_node=None)
 
 
 def agent_opt_iter(adj_mat, current_weights, covariance_data, ne=1, failed_node=None):
+    if not np.any((np.array(adj_mat) == 0)):
+        print('saturated')
+        return adj_mat, current_weights
+
     edge_mod_limit = ne * 2
     n = adj_mat.shape[0]
     beta = 1 / n
@@ -188,8 +192,8 @@ def agent_opt_iter(adj_mat, current_weights, covariance_data, ne=1, failed_node=
                     problem.add_constraint(A[i, j] > 0)  # Constraint 7
                     problem.add_constraint(A[i, j] <= PI[i, j])  # Constraint 8
 
-        problem.add_constraint(
-            abs(PI - adj_mat) ** 2 <= edge_mod_limit)  # Constraint 9
+        # problem.add_constraint(
+        #     abs(PI - adj_mat) ** 2 <= edge_mod_limit)  # Constraint 9
 
         try:
             sol = problem.solve(verbose=0, solver='mosek')
@@ -457,6 +461,9 @@ def team_opt_iter(adj_mat, current_weights, covariance_matrices,
     :param failed_node: the node that fails
     :return: new adjacency matrix and new weights
     """
+    if not np.any((np.array(adj_mat) == 0)):
+        print('saturated')
+        return adj_mat, current_weights
 
     edge_mod_limit = ne * 2
     n = adj_mat.shape[0]
