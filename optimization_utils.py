@@ -146,13 +146,13 @@ def agent_opt_iter(adj_mat, current_weights, covariance_data, ne=1, failed_node=
             if j == 0:
                 break
         i = i + 1
-        if j == 0:
-            break
 
     print(len(pos_adj_mat))
     if len(pos_adj_mat) == 0:
         return adj_mat, current_weights
     if len(pos_adj_mat) == 1:
+        return pos_adj_mat[0], current_weights
+    if np.array_equal(pos_adj_mat[0], pos_adj_mat[1]):
         return pos_adj_mat[0], current_weights
 
     best_sol_obj = None
@@ -513,13 +513,13 @@ def team_opt_iter(adj_mat, current_weights, covariance_matrices,
             if j == 0:
                 break
         i = i + 1
-        if j == 0:
-            break
 
     print(len(pos_adj_mat))
     if len(pos_adj_mat) == 0:
         return adj_mat, current_weights
     if len(pos_adj_mat) == 1:
+        return pos_adj_mat[0], current_weights
+    if np.array_equal(pos_adj_mat[0], pos_adj_mat[1]):
         return pos_adj_mat[0], current_weights
 
     best_sol_obj = None
