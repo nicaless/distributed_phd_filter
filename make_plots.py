@@ -26,11 +26,12 @@ mpl.rcParams.update(params)
 Params
 """
 # run_name = 'vary_fail_events'
-run_name = 'single_fail_n_consensus'
-
+# run_name = 'single_fail_n_consensus'
+run_name = 'results_iter'
 node_dir_plot = '5_nodes'
 trial_name = node_dir_plot + '/0_arith_greedy'
-node_list = [5, 6, 7, 10, 12, 15, 20, 25, 30]
+# node_list = [5, 6, 7, 10, 12, 15, 20, 25, 30]
+node_list = [5, 7, 10, 15]
 
 
 """
@@ -76,14 +77,14 @@ Plot Scatter for Errors, Covariance, OSPA, NMSE
 #                     if opt == 'base':
 #                         base = data['value'].values
 #                     else:
-#                         if opt == 'team':
-#                             # reset base for team
-#                             team_base_dir = '{t}_{h}_base'.format(t=trial, h=how)
-#                             base_dir = top_dir + '/' + node_dir + '/' + team_base_dir
-#                             fname = base_dir + '/{m}.csv'.format(m=m)
-#                             team_base_data = pd.read_csv(fname)
-#                             team_base_data = team_base_data[team_base_data['time'].isin(fail_int)]
-#                             base = team_base_data['value'].values
+#                         # if opt == 'team':
+#                         #     # reset base for team
+#                         #     team_base_dir = '{t}_{h}_base'.format(t=trial, h=how)
+#                         #     base_dir = top_dir + '/' + node_dir + '/' + team_base_dir
+#                         #     fname = base_dir + '/{m}.csv'.format(m=m)
+#                         #     team_base_data = pd.read_csv(fname)
+#                         #     team_base_data = team_base_data[team_base_data['time'].isin(fail_int)]
+#                         #     base = team_base_data['value'].values
 #
 #                         v = data['value'].values
 #                         diff = base - v
@@ -130,8 +131,8 @@ Plot Scatter for Errors, Covariance, OSPA, NMSE
 #         group_fail = tmp.groupby('failure_label').agg(agg_dict).reset_index()
 #
 #         fuse_method = c.split('_')[0]
-#         if 'team' in c:
-#             save_team_edge_density[fuse_method] = group_fail['edge_density']
+#         # if 'team' in c:
+#         #     save_team_edge_density[fuse_method] = group_fail['edge_density']
 #
 #         if m == 'max_tr_cov' and c == 'geom_agent':
 #             group_fail['diff'] = group_fail['diff'].apply(lambda x: np.log(abs(x)))
@@ -159,7 +160,7 @@ Plot Scatter for Errors, Covariance, OSPA, NMSE
 #     plt.xlabel('Edge Density')
 #     plt.ylabel('Mean Delta')
 #     plt.title(m.upper())
-#     plt.savefig('{m}.png'.format(m=m), bbox_inches='tight')
+#     plt.savefig('{m}_test.png'.format(m=m), bbox_inches='tight')
 #     plt.clf()
 
 
@@ -246,98 +247,98 @@ Plot Time Series for Covariance, for n = 7
 """
 Read in Data for Drone Plots
 """
-if trial_name is not None:
-    topology_dir = run_name + '/' + trial_name + '/topologies'
-    edge_list = {}
-    num_drones = 0
-    timesteps = 50
-    # timesteps = 20
-    for t in range(int(timesteps)):
-        edge_list[t] = []
-        new_A = []
-        f_name = '{dir}/{t}.csv'.format(dir=topology_dir, t=t)
-        with open(f_name, 'r') as f:
-            readCSV = csv.reader(f, delimiter=',')
-            for row in readCSV:
-                data = list(map(float, row))
-                new_A.append(data)
-        new_A = np.array(new_A)
-        num_drones = new_A.shape[0]
-        for i in range(num_drones):
-            for j in range(i + 1, num_drones):
-                if new_A[i, j] == 1:
-                    edge_list[t].append((i, j))
-
-    true_positions = pd.read_csv(run_name + '/' +
-                                 node_dir_plot +
-                                 '/true_positions.csv')
-    true_positions['z'] = 5
-    timesteps = max(true_positions['time'] + 1)
-
-    estimates = pd.read_csv(run_name + '/' + trial_name + '/estimates.csv')
-    estimates['z'] = 5
-
-    node_positions = pd.read_csv(run_name + '/' + trial_name +
-                                 '/robot_positions.csv')
-
-
-    """
-    Plot Overhead View
-    """
-    if not os.path.exists(run_name + '/' + trial_name + '/overhead'):
-        os.makedirs(run_name + '/' + trial_name + '/overhead')
-
-    for t in range(int(timesteps)):
-        ax = plt.axes()
-        plt.xlim((-50, 50))
-        plt.ylim((-50, 50))
-
-        # Plot Targets
-        tp_tmp = true_positions[true_positions['time'] == t]
-        ax.scatter(tp_tmp['x'], tp_tmp['y'], s=35, color='black',
-                   marker='+')
-
-        # Plot Estimates
-        e_tmp = estimates[estimates['time'] == t]
-        ax.scatter(e_tmp['x'], e_tmp['y'], s=25, color='orange', alpha=0.5)
-
-        node_tmp = node_positions[node_positions['time'] == t]
-
-        # Plot Drones
-        ax.scatter(node_tmp['x'], node_tmp['y'], s=30, color='blue',
-                   marker='^')
-
-        # Plot Adjacencies
-        for edge_index, edges in enumerate(edge_list[t]):
-            i = edges[0]
-            j = edges[1]
-            i_pos = node_tmp[node_tmp['node_id'] == i]
-            j_pos = node_tmp[node_tmp['node_id'] == j]
-
-            xl = [i_pos['x'].values[0], j_pos['x'].values[0]]
-            yl = [i_pos['y'].values[0], j_pos['y'].values[0]]
-            plt.plot(xl, yl, color='gray', alpha=0.5)
-
-        # Plot FOVs
-        for n in range(int(num_drones)):
-            pos = node_tmp[node_tmp['node_id'] == n]
-            p = plt.Circle((pos['x'].values[0], pos['y'].values[0]),
-                           pos['fov_radius'].values[0], alpha=0.1)
-            ax.add_patch(p)
-
-        # p = plt.Circle((-50, -50), 30, alpha=0.2, color='gray', ls='--', lw=3)
-        # ax.add_patch(p)
-        # p = plt.Circle((50, -50), 30, alpha=0.2, color='gray', ls='--', lw=3)
-        # ax.add_patch(p)
-        # p = plt.Circle((-50, 50), 30, alpha=0.2, color='gray', ls='--', lw=3)
-        # ax.add_patch(p)
-        # p = plt.Circle((50, 50), 30, alpha=0.2, color='gray', ls='--', lw=3)
-        # ax.add_patch(p)
-
-        plt.savefig(run_name + '/' +
-                    trial_name + '/overhead/{t}.png'.format(t=t),
-                    bbox_inches='tight')
-        plt.clf()
+# if trial_name is not None:
+#     topology_dir = run_name + '/' + trial_name + '/topologies'
+#     edge_list = {}
+#     num_drones = 0
+#     timesteps = 50
+#     # timesteps = 20
+#     for t in range(int(timesteps)):
+#         edge_list[t] = []
+#         new_A = []
+#         f_name = '{dir}/{t}.csv'.format(dir=topology_dir, t=t)
+#         with open(f_name, 'r') as f:
+#             readCSV = csv.reader(f, delimiter=',')
+#             for row in readCSV:
+#                 data = list(map(float, row))
+#                 new_A.append(data)
+#         new_A = np.array(new_A)
+#         num_drones = new_A.shape[0]
+#         for i in range(num_drones):
+#             for j in range(i + 1, num_drones):
+#                 if new_A[i, j] == 1:
+#                     edge_list[t].append((i, j))
+#
+#     true_positions = pd.read_csv(run_name + '/' +
+#                                  node_dir_plot +
+#                                  '/true_positions.csv')
+#     true_positions['z'] = 5
+#     timesteps = max(true_positions['time'] + 1)
+#
+#     estimates = pd.read_csv(run_name + '/' + trial_name + '/estimates.csv')
+#     estimates['z'] = 5
+#
+#     node_positions = pd.read_csv(run_name + '/' + trial_name +
+#                                  '/robot_positions.csv')
+#
+#
+#     """
+#     Plot Overhead View
+#     """
+#     if not os.path.exists(run_name + '/' + trial_name + '/overhead'):
+#         os.makedirs(run_name + '/' + trial_name + '/overhead')
+#
+#     for t in range(int(timesteps)):
+#         ax = plt.axes()
+#         plt.xlim((-50, 50))
+#         plt.ylim((-50, 50))
+#
+#         # Plot Targets
+#         tp_tmp = true_positions[true_positions['time'] == t]
+#         ax.scatter(tp_tmp['x'], tp_tmp['y'], s=35, color='black',
+#                    marker='+')
+#
+#         # Plot Estimates
+#         e_tmp = estimates[estimates['time'] == t]
+#         ax.scatter(e_tmp['x'], e_tmp['y'], s=25, color='orange', alpha=0.5)
+#
+#         node_tmp = node_positions[node_positions['time'] == t]
+#
+#         # Plot Drones
+#         ax.scatter(node_tmp['x'], node_tmp['y'], s=30, color='blue',
+#                    marker='^')
+#
+#         # Plot Adjacencies
+#         for edge_index, edges in enumerate(edge_list[t]):
+#             i = edges[0]
+#             j = edges[1]
+#             i_pos = node_tmp[node_tmp['node_id'] == i]
+#             j_pos = node_tmp[node_tmp['node_id'] == j]
+#
+#             xl = [i_pos['x'].values[0], j_pos['x'].values[0]]
+#             yl = [i_pos['y'].values[0], j_pos['y'].values[0]]
+#             plt.plot(xl, yl, color='gray', alpha=0.5)
+#
+#         # Plot FOVs
+#         for n in range(int(num_drones)):
+#             pos = node_tmp[node_tmp['node_id'] == n]
+#             p = plt.Circle((pos['x'].values[0], pos['y'].values[0]),
+#                            pos['fov_radius'].values[0], alpha=0.1)
+#             ax.add_patch(p)
+#
+#         # p = plt.Circle((-50, -50), 30, alpha=0.2, color='gray', ls='--', lw=3)
+#         # ax.add_patch(p)
+#         # p = plt.Circle((50, -50), 30, alpha=0.2, color='gray', ls='--', lw=3)
+#         # ax.add_patch(p)
+#         # p = plt.Circle((-50, 50), 30, alpha=0.2, color='gray', ls='--', lw=3)
+#         # ax.add_patch(p)
+#         # p = plt.Circle((50, 50), 30, alpha=0.2, color='gray', ls='--', lw=3)
+#         # ax.add_patch(p)
+#
+#         plt.savefig(run_name + '/' +
+#                     trial_name + '/overhead/{t}.png'.format(t=t),
+#                     bbox_inches='tight')
+#         plt.clf()
 
 
 #     """
@@ -490,3 +491,186 @@ Plot Target True Positions
 
 
 
+#### BOXPLOT
+for m in ['errors', 'max_tr_cov', 'mean_tr_cov', 'ospa', 'nmse']:
+    print(m)
+    plt.figure(figsize=[8, 4])
+    ax = plt.axes()
+
+    time_val = []
+    diffs = []
+    time_val_edge = []
+    edge_count_list = []
+    edge_density = []
+    trial_code = []
+
+    for n in node_list:
+        for how in ['arith', 'geom']:
+            base = None
+            for opt in ['base', 'agent', 'greedy', 'random', 'team']:
+                for trial in range(10):
+                    top_dir = run_name
+
+                    # Read Metric Data
+                    node_dir = '{n}_nodes'.format(n=n)
+                    trial_dir = '{t}_{h}_{o}'.format(t=trial,
+                                                     h=how,
+                                                     o=opt)
+                    dir = top_dir + '/' + node_dir + '/' + trial_dir
+                    fname = dir + '/{m}.csv'.format(m=m)
+                    if not os.path.exists(fname):
+                        continue
+                    data = pd.read_csv(fname)
+
+                    num_drones = n
+                    fails_before_saturation = num_drones * (num_drones - 1) / 2 - (num_drones - 1)
+                    fail_freq = int(np.ceil(50 / fails_before_saturation))
+                    fail_int = list(range(1, 50, fail_freq))
+                    fail_int_stagger = list(range(0, 50, fail_freq))
+
+                    data = data[data['time'].isin(fail_int)]
+
+                    # Calculate Difference from Base
+                    if opt == 'base':
+                        base = data['value'].values
+                    else:
+                        v = data['value'].values
+                        diff = base - v
+                        diffs.extend(diff)
+                        time_val.extend(data['time'].values)
+
+                        topology_dir = dir + '/topologies'
+                        num_possible_edges = (n * (n - 1)) / 2
+
+                        for t in range(50):
+                        # for t in fail_int:
+                            edge_count = 0
+                            new_A = []
+                            f_name = '{dir}/{t}.csv'.format(dir=topology_dir,
+                                                            t=t)
+                            with open(f_name, 'r') as f:
+                                readCSV = csv.reader(f, delimiter=',')
+                                for row in readCSV:
+                                    data = list(map(float, row))
+                                    new_A.append(data)
+                            new_A = np.array(new_A)
+                            for i in range(num_drones):
+                                for j in range(i + 1, num_drones):
+                                    if new_A[i, j] == 1:
+                                        edge_count += 1
+                            time_val_edge.append(t)
+                            edge_count_list.append(edge_count)
+                            edge_density.append(edge_count / float(num_possible_edges))
+                            trial_code.append('{h}_{o}'.format(h=how, o=opt))
+
+    df = pd.DataFrame([time_val, diffs, edge_density, trial_code])
+    df = df.transpose()
+    df.columns = ['time', 'diff', 'edge_density', 'trial_code']
+    df['failure_label'] = df['time']
+    save_file_name = '{m}.csv'.format(m=m)
+    df.to_csv(save_file_name)
+
+    df = df.dropna()
+    # df['diff'].fillna(df['diff'].mean(), inplace=True)
+    # df['failure_label'].fillna(df['failure_label'].mean(), inplace=True)
+
+    # combos = df['trial_code'].unique()
+    combos = ['arith_agent', 'arith_greedy', 'arith_random', 'arith_team',
+              'geom_agent', 'geom_greedy', 'geom_random', 'geom_team']
+    edge_densities_x_lab = [0, 0.5, 1]
+    xticks = []
+    lab_start = 0
+    edge_density_summary = {}
+    for idx, x in enumerate(edge_densities_x_lab):
+        if x == 0:
+            continue
+        bp_data = []
+        bp_label = []
+        bp_summary = {'method': [], 'mean': [], 'std': []}
+        for c in combos:
+            tmp = df[(df['trial_code'] == c) &
+                     (df['edge_density'] <= x) &
+                     (df['edge_density'] > edge_densities_x_lab[idx-1])]
+
+            mx = tmp['diff'].max()
+            mn = tmp['diff'].min()
+            tmp['diff'] = (2 * (tmp['diff'] - mn) / (mx - mn)) - 1
+
+            bp_summary['mean'].append(tmp['diff'].mean())
+            bp_summary['std'].append(tmp['diff'].std())
+
+            bp_data.append(tmp['diff'])
+
+            if c == 'arith_agent':
+                lab = 'RCAMC'
+            elif c == 'arith_greedy':
+                lab = 'GreedyAMC'
+            elif c == 'arith_team':
+                lab = 'TCAMC'
+            elif c == 'geom_agent':
+                lab = 'RCGMC'
+            elif c == 'geom_greedy':
+                lab = 'GreedyGMC'
+            elif c == 'geom_team':
+                lab = 'TCGMC'
+            elif c == 'arith_random':
+                lab = 'RandomAMC'
+            else:
+                lab = 'RandomGMC'
+
+            bp_label.append(lab)
+            bp_summary['method'].append(lab)
+
+        edge_density_summary[x] = pd.DataFrame(bp_summary)
+
+        xticks.append(lab_start + 4)
+        bp = plt.boxplot(bp_data, positions=[lab_start, lab_start+1, lab_start+2,
+                                             lab_start+3, lab_start+4,
+                                             lab_start+5, lab_start+6, lab_start+7],
+                         widths=1,
+                         showfliers=False,
+                         patch_artist=True,
+                         medianprops=dict(color='black'))
+        plt.setp(bp['boxes'][0], facecolor='blue')
+        plt.setp(bp['boxes'][1], facecolor='orange')
+        plt.setp(bp['boxes'][2], facecolor='green')
+        plt.setp(bp['boxes'][3], facecolor='red')
+        plt.setp(bp['boxes'][4], facecolor='purple')
+        plt.setp(bp['boxes'][5], facecolor='brown')
+        plt.setp(bp['boxes'][6], facecolor='pink')
+        plt.setp(bp['boxes'][7], facecolor='gray')
+
+        lab_start += 9
+
+    edge_density_summary_df = []
+    for k, v in edge_density_summary.items():
+        edge_density_summary_df.append(v)
+    edge_density_summary_df = pd.concat(edge_density_summary_df)
+    edge_density_summary_df.to_csv('{m}_summary.csv'.format(m=m))
+
+    hB, = plt.plot([1, 1], 'blue')
+    hO, = plt.plot([1, 1], 'orange')
+    hG, = plt.plot([1, 1], 'green')
+    hR, = plt.plot([1, 1], 'red')
+    hP, = plt.plot([1, 1], 'purple')
+    hBr, = plt.plot([1, 1], 'brown')
+    hPi, = plt.plot([1, 1], 'pink')
+    hGr, = plt.plot([1, 1], 'gray')
+    plt.legend((hB, hO, hG, hR, hP, hBr, hPi, hGr), bp_label, frameon=True, loc=(1.04,0))
+
+    hB.set_visible(False)
+    hO.set_visible(False)
+    hG.set_visible(False)
+    hR.set_visible(False)
+    hP.set_visible(False)
+    hBr.set_visible(False)
+    hPi.set_visible(False)
+    hGr.set_visible(False)
+
+    ax.set_xticklabels(['< 50%', '> 50%'])
+    ax.set_xticks(xticks)
+    plt.xlabel('Edge Density')
+    plt.ylabel('Delta')
+    plt.title(m.upper())
+    plt.savefig('{m}_test.png'.format(m=m), bbox_inches='tight')
+    plt.clf()
