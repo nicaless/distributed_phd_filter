@@ -139,7 +139,7 @@ for n in range(len(noise_mult)):
                                        opt=opt,
                                        fail_int=fail_int,
                                        base=base,
-                                       noise_mult=noise_mult[noise])
+                                       noise_mult=noise_mult[n])
 
             """
             Save Fail Sequence
@@ -156,7 +156,7 @@ for n in range(len(noise_mult)):
                                        opt=opt,
                                        fail_int=saved_fail_sequence,
                                        base=base,
-                                       noise_mult=noise_mult[noise])
+                                       noise_mult=noise_mult[n])
         run_time_seconds = time.time() - start_time
         run_times.append(
             {'trial': n, 'opt': opt, 'time': run_time_seconds})
