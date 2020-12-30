@@ -5,6 +5,7 @@ import matplotlib.pyplot as plt
 import networkx as nx
 import pandas as pd
 import os
+import time
 
 from DKFNetwork import DKFNetwork
 from DKFNode import DKFNode
@@ -112,7 +113,9 @@ for i in range(num_nodes):
 For Loop for all Simulations
 """
 saved_fail_sequence = None
-for noise in range(len(noise_mult)):
+run_times = []
+for n in range(len(noise_mult)):
+    noise = noise_mult[n]
     for opt in ['base', 'agent', 'greedy']:
     # for opt in ['base', 'agent']:
     # for opt in ['base', 'team']:
@@ -129,6 +132,7 @@ for noise in range(len(noise_mult)):
         """
         Run Simulation
         """
+        start_time = time.time()
         base = opt == 'base'
         if base:
             filternetwork.step_through(inputs,
@@ -153,6 +157,9 @@ for noise in range(len(noise_mult)):
                                        fail_int=saved_fail_sequence,
                                        base=base,
                                        noise_mult=noise_mult[noise])
+        run_time_seconds = time.time() - start_time
+        run_times.append(
+            {'trial': n, 'opt': opt, 'time': run_time_seconds})
 
         """
         Save Data
@@ -168,6 +175,8 @@ for noise in range(len(noise_mult)):
         filternetwork.save_true_target_states(trial_name)
         filternetwork.save_topologies(trial_name + '/topologies')
 
+run_times_df = pd.DataFrame(run_times)
+run_times_df.to_csv(run_name + '/run_times.csv')
 
 # print('plot')
 # # Plot Targets
