@@ -583,7 +583,13 @@ def bnb_enum_edge_heuristic(failed_node, adj_mat):
     # for e in other_paired_edges:
     #     edge_decisions[e] = None
 
-    return edge_decisions, curr_edge_decisions
+    # Shuffle edge decisions
+    edge_keys = list(edge_decisions.keys())
+    np.random.shuffle(edge_keys)
+    edge_decisions_shuffle = {e: edge_decisions[e]
+                              for e in edge_keys}
+
+    return edge_decisions_shuffle, curr_edge_decisions
 
 
 def team_opt_bnb_greedy_heuristic(failed_node, adj_mat, covariance_matrices, tried_nodes, use_max=True):
@@ -660,14 +666,12 @@ def team_opt_sdp(adj_mat, cov_array, inv_cov_array, s, edge_decisions, ne=1):
 
     delta_bar = problem.add_variable('delta_bar', (p_size, p_size))
     delta_array = problem.add_variable('delta_array', (p_size, s))
-    # schur = problem.add_variable('schur', (p_size * 2, p_size * 2))
 
     # Add Params (ie constant affine expressions to help with creating constraints)
     I = pic.new_param('I', np.eye(s))
     Ibar = pic.new_param('Ibar', np.eye(p_size))
     cov_array_param = pic.new_param('covs', cov_array)
     inv_cov_array_param = pic.new_param('inv_covs', inv_cov_array)
-    # PI = pic.new_param('PI', pi)
 
     # Set Objective
     problem.set_objective('min', beta * pic.trace(Pbar))
@@ -691,14 +695,8 @@ def team_opt_sdp(adj_mat, cov_array, inv_cov_array, s, edge_decisions, ne=1):
         end = i * s + s
         problem.add_constraint(abs(delta_array[start:end, :] - delta_list[i]) <= tol)
 
-    # Setting Additional Constraint such that delta_bar and Pbar elements in schur variable (with some tolerance)
-    # problem.add_constraint(abs(schur[0:p_size, 0:p_size] - Pbar) <= tol)
-    # problem.add_constraint(abs(schur[p_size:, p_size:] - delta_bar) <= tol)
-    # problem.add_constraint(schur[0:p_size, p_size:] == np.eye(p_size))
-    # problem.add_constraint(schur[p_size:, 0:p_size] == np.eye(p_size))
 
     # Schur constraint
-    # problem.add_constraint(schur >= 0)
     problem.add_constraint(((Pbar & Ibar) //
                            (Ibar & delta_bar)).hermitianized >> 0)
 
@@ -759,12 +757,12 @@ def agent_opt_sdp(adj_mat, covariance_data, edge_decisions,
         node_bin[0][failed_node] = 1
 
     # Reducing Magnitude if necessary
-    # covariance_data = np.nan_to_num(covariance_data)
-    # magnitude_covs = [magnitude(cov) for cov in covariance_data]
-    # if max(magnitude_covs) > 15:
-    #     print('rescaling matrix magnitude, magnitude too high')
-    #     covariance_data = [cov * (10 ** (-1 * max(magnitude_covs)))
-    #                        for cov in covariance_data]
+    covariance_data = np.nan_to_num(covariance_data)
+    magnitude_covs = [magnitude(cov) for cov in covariance_data]
+    if max(magnitude_covs) > 15:
+        print('rescaling matrix magnitude, magnitude too high')
+        covariance_data = [cov * (10 ** (-1 * max(magnitude_covs)))
+                           for cov in covariance_data]
 
     # Init Problem
     problem = pic.Problem()
@@ -797,13 +795,13 @@ def agent_opt_sdp(adj_mat, covariance_data, edge_decisions,
                 problem.add_constraint(A[i, j] > 0)  # Constraint 7
                 problem.add_constraint(A[i, j] <= PI[i, j])  # Constraint 8
 
-    problem.add_constraint(
-        abs(PI - adj_mat) ** 2 <= edge_mod_limit)  # Constraint 9
-
     for e, d in edge_decisions.items():
         if d is not None:
             problem.add_constraint(PI[e[0], e[1]] == d)
             problem.add_constraint(PI[e[1], e[0]] == d)
+
+    problem.add_constraint(
+        abs(PI - adj_mat) ** 2 <= edge_mod_limit)  # Constraint 9
 
     try:
         sol = problem.solve(verbose=0, solver='mosek')
@@ -931,15 +929,17 @@ class BBTreeNode():
             print("Heap Size: ", len(heap))
             _, _, node = heappop(heap)
             obj, problem_status, A, PI = node.buildSolveProblem()
+            if nodecount == 1:
+                bestobj = obj
             print("Result: ", obj)
             print(PI)
             print(A)
             if problem_status == 'solver error':
                 continue
             if problem_status in ['integer optimal', 'optimal']:
-                if obj > bestres - 1e-3:  # even the relaxed problem sucks. forget about this branch then
+                if (obj > bestres - 1e-3) and (nodecount > 1):  # even the relaxed problem sucks. forget about this branch then
                     print("Relaxed Problem Stinks. Killing this branch.")
-                    pass
+                    continue
                 elif self.check_integrals(PI):  #if a valid solution then this is the new best
                     print("New Best Integral solution.")
                     bestres = obj
@@ -962,7 +962,12 @@ class BBTreeNode():
                             print("previously", self.curr_edge_decisions[e])
                             print("now", node.edge_decisions[e])
                             changed_edges += 1
-                    if changed_edges > self.ne:
+                        elif node.edge_decisions[e] == self.curr_edge_decisions[e]:
+                            continue
+                    if changed_edges >= self.ne:
+                        continue
+
+                    if next_edge is None:
                         continue
 
                     print("branch on edge:", next_edge)

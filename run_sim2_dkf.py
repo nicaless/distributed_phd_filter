@@ -36,7 +36,7 @@ print(fail_int)
 x_start = -50 + (100.0 / (num_nodes + 1))
 pos_start = np.array([x_start, 0, 20])
 pos_init_dist = np.floor(100.0 / (num_nodes + 1))
-fov = 50  # radius of FOV
+fov = 30  # radius of FOV
 noise_mult = [1., 1., 1., 1., 1.]
 
 
@@ -113,7 +113,8 @@ For Loop for all Simulations
 """
 saved_fail_sequence = None
 for noise in range(len(noise_mult)):
-    for opt in ['base', 'agent', 'greedy']:
+    # for opt in ['base', 'agent', 'greedy']:
+    for opt in ['base', 'agent']:
     # for opt in ['base', 'team']:
     # for opt in ['base']:
         trial_name = run_name + '/{noise}_{o}'.format(noise=noise,

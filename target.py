@@ -1,8 +1,8 @@
 import numpy as np
 
 
-dt_1 = .1
-dt_2 = .1
+dt_1 = 1.
+dt_2 = 1.
 # DEFAULT_INIT_STATE = np.array([[0.0], [0.0], [dt_1], [dt_2]])
 DEFAULT_INIT_STATE = np.array([[0.0], [0.0], [0.], [0.]])
 DEFAULT_INIT_COV = np.diag((0.01, 0.01, 0.01, 0.01))

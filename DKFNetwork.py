@@ -61,7 +61,7 @@ class DKFNetwork:
         Local Target Estimation
         """
         for id, n in nodes.items():
-            if known_input:
+            if not known_input:
                 n.predict(len(nodes))
             else:
                 n.predict(len(nodes), inputs=next_input)
@@ -74,20 +74,22 @@ class DKFNetwork:
         """
         Init Consensus
         """
+        missed_obs = False
         for id, n in nodes.items():
             n.init_consensus()
+            if n.missed_obs:
+                missed_obs = True
 
         """
         Do Optimization and Formation Synthesis
         """
         if failure and not base:
-            if opt == 'agent':
+            if opt == 'agent' and not missed_obs:
                 self.do_agent_opt(fail_node)
-            elif opt == 'team':
+            elif opt == 'team' and not missed_obs:
                 self.do_team_opt(fail_node)
-            elif opt == 'greedy':
+            elif opt == 'greedy' and not missed_obs:
                 self.do_greedy_opt(fail_node)
-
             # Random strategy
             else:
                 self.do_random_opt(fail_node)

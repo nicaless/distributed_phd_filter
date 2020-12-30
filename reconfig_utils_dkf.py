@@ -199,7 +199,8 @@ def ph(x, H):
     if x < 0:
         return 0
     else:
-        return np.exp(H * x)
+        return 999
+        # return np.exp(H * x)
 
 
 def Hc(drone_pos, fov_radius, focal_length=0.04, sigma=0.3, R=30, kappa=0.5):

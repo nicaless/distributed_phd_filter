@@ -62,6 +62,8 @@ class DKFNode:
         self.consensus_positions = {}
         self.consensus_target_covs = {}
 
+        self.missed_obs = False
+
     def update_targets(self, targets):
         self.targets = targets
 
@@ -174,7 +176,8 @@ class DKFNode:
             self.blockR = np.eye(self.blockH.shape[0])
             self.blockG = G
             self.observed_meas = observed_meas
-            return None
+            self.measurements = measurements
+            self.missed_obs = True
         else:
             self.full_cov_update = all_covs
             self.all_measurements = all_measurements
@@ -182,8 +185,8 @@ class DKFNode:
             self.blockR = R
             self.blockG = G
             self.observed_meas = observed_meas
-
-        self.measurements = measurements
+            self.measurements = measurements
+            self.missed_obs = False
 
     def check_measure_oob(self, m):
         if m is None:
