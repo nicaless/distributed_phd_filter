@@ -254,10 +254,15 @@ class DKFNetwork:
             trace_c = np.trace(c)
             covariance_data.append(trace_c)
 
-        new_config, new_weights = agent_opt(self.adjacency_matrix(),
-                                            current_weights,
-                                            covariance_data,
-                                            failed_node=failed_node)
+        # new_config, new_weights = agent_opt(self.adjacency_matrix(),
+        #                                     current_weights,
+        #                                     covariance_data,
+        #                                     failed_node=failed_node)
+
+        new_config, new_weights = agent_opt_bnb(self.adjacency_matrix(),
+                                                current_weights,
+                                                covariance_data,
+                                                failed_node=failed_node)
 
         G = nx.from_numpy_matrix(new_config)
         self.network = G
