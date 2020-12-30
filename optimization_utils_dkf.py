@@ -932,8 +932,8 @@ class BBTreeNode():
             if nodecount == 1:
                 bestobj = obj
             print("Result: ", obj)
-            print(PI)
-            print(A)
+            # print(PI)
+            # print(A)
             if problem_status == 'solver error':
                 continue
             if problem_status in ['integer optimal', 'optimal']:
@@ -1014,7 +1014,10 @@ def team_opt_bnb(adj_mat, current_weights, covariance_matrices, omegas, failed_n
                     nw = 0.1
                 new_weights[i][j] = nw
                 new_weights[j][i] = nw
+
+    new_weights = normalize_weights(new_weights)
     print(new_config)
+    print(new_weights)
     return new_config, new_weights
 
 
@@ -1053,5 +1056,22 @@ def agent_opt_bnb(adj_mat, current_weights, covariance_data, failed_node, ne=1):
                     nw = 0.1
                 new_weights[i][j] = nw
                 new_weights[j][i] = nw
+
+    new_weights = normalize_weights(new_weights)
+    print(new_weights)
     print(new_config)
     return new_config, new_weights
+
+
+def normalize_weights(weights):
+    n = len(weights.keys())
+
+    for i in range(n):
+        total = 0
+        node_weights = weights[i]
+        for node, weight in node_weights.items():
+            total += weight
+        for node, weight in node_weights.items():
+            weights[i][node] = weight / total
+
+    return weights

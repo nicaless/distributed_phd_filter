@@ -92,7 +92,8 @@ class DKFNetwork:
                 self.do_greedy_opt(fail_node)
             # Random strategy
             else:
-                self.do_random_opt(fail_node)
+                self.do_greedy_opt(fail_node)
+                # self.do_random_opt(fail_node)
 
             # Formation Synthesis
             current_coords = {nid: n.position for nid, n in nodes.items()}
