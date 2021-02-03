@@ -1,22 +1,23 @@
 from copy import deepcopy
-import math
-from numba import jit, njit, cuda
 import numpy as np
 from operator import attrgetter
 from scipy.spatial.distance import mahalanobis
 
 from target import Target
 
+"""
+Some code borrowed from https://github.com/danstowell/gmphd/blob/master/gmphd.py
+"""
+
 
 class PHDFilterNode:
     def __init__(self,
                  node_id,
                  birthgmm,
-                 prune_thresh=1e-6,
-                 merge_thresh=0.2,
-                 max_comp=100,
+                 prune_thresh=1e-2,
+                 merge_thresh=1,
+                 max_comp=20,
                  clutter_rate=5,
-                 # clutter_rate=0,
                  position=np.array([0, 0, 0]),
                  region=[(-50, 50), (-50, 50)]
                  ):
@@ -55,6 +56,9 @@ class PHDFilterNode:
 
         # reweighted results
         self.reweighted_targets = []
+
+        # consensus results
+        self.consensus_targets = []
 
         # TRACKERS
         self.observations = {}
@@ -99,9 +103,6 @@ class PHDFilterNode:
         self.predicted_pos = predicted_pos
         self.predicted_targets = all_targets
 
-    def add_clutter(self):
-        pass
-
     def update(self, measurements):
         self.measurements = measurements
 
@@ -131,9 +132,13 @@ class PHDFilterNode:
             weightsum = 0
             for index, comp in enumerate(self.predicted_targets):
                 obs_probability = dmvnorm(nu[index], s[index], m)
-                newcomp_weight = float(comp.weight *
-                                       self.detection_probability *
-                                       obs_probability)
+                if obs_probability > 0:
+                    newcomp_weight = float(comp.weight *
+                                           self.detection_probability)
+                else:
+                    newcomp_weight = float(comp.weight *
+                                           self.detection_probability *
+                                           obs_probability)
                 newcomp_state = comp.state + np.dot(K[index], m - nu[index])
                 newcomp_state_cov = comp.state_cov
                 newgmmpartial.append(Target(init_weight=newcomp_weight,
@@ -154,9 +159,6 @@ class PHDFilterNode:
         self.updated_targets = newgmm
 
     def check_measure_oob(self, m):
-        # # TODO: investigate why there have nan states/measurements anyway
-        # any_nan = np.isnan(m).any()
-
         x = m[0][0]
         y = m[1][0]
 
@@ -270,15 +272,8 @@ class PHDFilterNode:
                                            for t in self.targets]
             self.consensus_target_covs[i] = [t.state_cov for t in self.targets]
 
-@njit
+
 def dmvnorm(state, cov, obs):
-    """
-    Evaluate a multivariate normal, given a state (vector) and covariance (matrix) and a position x (vector) at which to evaluate"
-    :param state:
-    :param cov:
-    :param obs:
-    :return:
-    """
     k = state.shape[0]
     part1 = (2.0 * np.pi) ** (-k * 0.5)
     part2 = np.power(np.linalg.det(cov), -0.5)

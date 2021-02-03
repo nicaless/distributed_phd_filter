@@ -1,6 +1,4 @@
-import math
 import numpy as np
-import scipy
 
 
 class Target:
@@ -11,8 +9,7 @@ class Target:
                  process_noise=0.001,
                  step=3,
                  dt_1=1,
-                 dt_2=1,
-                 circle=False):
+                 dt_2=1):
         self.state = init_state
         self.state_cov = init_cov
         self.weight = init_weight
@@ -26,24 +23,14 @@ class Target:
         self.all_cov = []
         self.all_cov.append(init_cov)
 
-        self.is_circle_trajectory = circle
-        if circle:
-            self.A = np.array([[1, 0, 0, 0], [0, 1, 0, 0],
-                               [0, 0, 1, 0], [0, 0, 0, 0]])
-            self.B = np.array([[math.cos(0), 0],
-                               [math.sin(0), 0],
-                               [0.0, 1],
-                               [1.0, 0.0]])
-            self.U = np.array([[step, 0.1]]).T
-        else:
-            self.state[2][0] = step
-            self.state[3][0] = step
-            self.A = np.array([[1, 0, dt_1, 0],
-                               [0, 1, 0, dt_2],
-                               [0, 0, 1, 0],
-                               [0, 0, 0, 1]])
-            self.B = np.eye(init_state.shape[0])
-            self.U = np.zeros((init_state.shape[0], 1))
+        self.state[2][0] = step
+        self.state[3][0] = step
+        self.A = np.array([[1, 0, dt_1, 0],
+                           [0, 1, 0, dt_2],
+                           [0, 0, 1, 0],
+                           [0, 0, 0, 1]])
+        self.B = np.eye(init_state.shape[0])
+        self.U = np.zeros((init_state.shape[0], 1))
 
         self.Q = np.eye(init_state.shape[0])
 
@@ -60,9 +47,6 @@ class Target:
 
     def next_state(self, noise=False):
         x = self.state
-        if self.is_circle_trajectory:
-            self.B[0, 0] = 0.1 * math.cos(x[2, 0])
-            self.B[1, 0] = 0.1 * math.sin(x[2, 0])
         next_state = np.dot(self.A, x) + np.dot(self.B, self.U)
 
         # Add small process noise
@@ -86,6 +70,3 @@ class Target:
 
     def sample(self, N=1):
         return np.random.multivariate_normal(self.state.flat, self.state_cov, size=N)
-
-
-

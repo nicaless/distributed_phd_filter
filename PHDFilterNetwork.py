@@ -1,25 +1,16 @@
-import math
 import networkx as nx
-from numba import jit, njit, cuda
-import numpy as np
+from numba import njit
 from operator import attrgetter
 import pandas as pd
-import platform
 import scipy
 from scipy.spatial.distance import mahalanobis
 
 from ospa import *
 from target import Target
 
-#from optimization_utils import *
-#from reconfig_utils import *
-if platform.system() == 'Linux':
-    print('loading in files with jit')
-    from optimization_utils_jit import *
-    from reconfig_utils_jit import *
-else:
-    from optimization_utils import *
-    from reconfig_utils import *
+from BranchAndBoundSolver import BBTreeNode, get_possible_edges
+from optimization_utils import *
+from reconfig_utils import *
 
 
 class PHDFilterNetwork:
@@ -27,7 +18,7 @@ class PHDFilterNetwork:
                  nodes,
                  weights,
                  G,
-                 merge_thresh=0.2):
+                 merge_thresh=1):
         self.network = G
         nx.set_node_attributes(self.network, nodes, 'node')
         nx.set_node_attributes(self.network, weights, 'weights')
@@ -116,7 +107,7 @@ class PHDFilterNetwork:
                 if opt == 'agent':
                     self.do_agent_opt(fail_node, how=how)
                 elif opt == 'team':
-                    self.do_team_opt(how=how)
+                    self.do_team_opt(fail_node, how=how)
                 elif opt == 'greedy':
                     self.do_greedy_opt(fail_node, how=how)
 
@@ -145,7 +136,6 @@ class PHDFilterNetwork:
             L = int(max(3.0, len(nodes) / 2.0))
             for l in range(L):
                 self.cardinality_consensus()
-                self.fuse_components(how=how)
                 self.rescale_component_weights()
 
             for id, n in nodes.items():
@@ -202,15 +192,6 @@ class PHDFilterNetwork:
         center_y = sum(y) / float(len(x))
         return np.array([[center_x], [center_y]])
 
-    # TODO: remove, probably not needed anymore
-    def reduce_comps(self, node_id):
-        node = nx.get_node_attributes(self.network, 'node')[node_id]
-        node_comps = node.targets
-        limit = min(self.cardinality[node_id], node.max_components)
-        self.cardinality[node_id] = limit
-        keep_node_comps = node_comps[:limit]
-        node.targets = keep_node_comps
-
     """
     Optimization
     """
@@ -255,49 +236,57 @@ class PHDFilterNetwork:
             det_c = np.linalg.det(c)
             covariance_data.append((1/min_cardinality) * det_c)
 
-        new_config, new_weights = agent_opt(self.adjacency_matrix(),
-                                            current_weights,
-                                            covariance_data,
-                                            failed_node=failed_node)
-        print(current_weights)
-        print(new_weights)
+        # _, _, new_config, new_weights = agent_opt(self.adjacency_matrix(),
+        #                                     current_weights,
+        #                                     covariance_data,
+        #                                     failed_node=failed_node)
+
+        # GET POSSIBLE EDGES
+        possible_edge_decisions, current_edge_decisions = \
+            get_possible_edges(failed_node, self.adjacency_matrix())
+
+        # SOLVE PROBLEM WITH BRANCH AND BOUND SOLVER
+        root = BBTreeNode(possible_edge_decisions, current_edge_decisions,
+                          self.adjacency_matrix(), current_weights,
+                          covariance_data, failed_node=failed_node, opt='agent')
+        bestobj, bestnode, new_config, best_weights = root.bbsolve()
+
         G = nx.from_numpy_matrix(new_config)
         self.network = G
         nx.set_node_attributes(self.network, nodes, 'node')
-        nx.set_node_attributes(self.network, new_weights, 'weights')
-        # G = nx.from_numpy_matrix(new_config)
-        # self.network = G
-        # nx.set_node_attributes(self.network, nodes, 'node')
-        #
-        # new_weights = self.get_metro_weights()
-        # nx.set_node_attributes(self.network, new_weights, 'weights')
 
-    def do_team_opt(self, how='geom'):
+        new_weights = self.get_metro_weights()
+        nx.set_node_attributes(self.network, new_weights, 'weights')
+
+    def do_team_opt(self, failed_node, how='geom'):
         nodes = nx.get_node_attributes(self.network, 'node')
 
         min_cardinality, cov_data = self.prep_optimization_data(how=how)
 
         current_weights = nx.get_node_attributes(self.network, 'weights')
 
-        # new_config, new_weights = team_opt(self.adjacency_matrix(),
-        #                                     current_weights,
-        #                                     cov_data)
-        new_config, new_weights = team_opt2(self.adjacency_matrix(),
-                                            current_weights,
-                                            cov_data,
-                                            how=how)
-        print(current_weights)
-        print(new_weights)
+        # _, _, new_config, new_weights = team_opt(self.adjacency_matrix(),
+        #                                          current_weights,
+        #                                          cov_data,
+        #                                          how=how)
+
+        # GET POSSIBLE EDGES
+        possible_edge_decisions, current_edge_decisions = \
+            get_possible_edges(failed_node, self.adjacency_matrix())
+
+        # SOLVE PROBLEM WITH BRANCH AND BOUND SOLVER
+        root = BBTreeNode(possible_edge_decisions, current_edge_decisions,
+                          self.adjacency_matrix(), current_weights,
+                          cov_data, opt='team')
+        bestobj, bestnode, new_config, best_weights = \
+            root.bbsolve(fuse_method=how)
+
         G = nx.from_numpy_matrix(new_config)
         self.network = G
         nx.set_node_attributes(self.network, nodes, 'node')
-        nx.set_node_attributes(self.network, new_weights, 'weights')
-        # G = nx.from_numpy_matrix(new_config)
-        # self.network = G
-        # nx.set_node_attributes(self.network, nodes, 'node')
         #
-        # new_weights = self.get_metro_weights()
-        # nx.set_node_attributes(self.network, new_weights, 'weights')
+        new_weights = self.get_metro_weights()
+        nx.set_node_attributes(self.network, new_weights, 'weights')
 
     def do_greedy_opt(self, failed_node, how='geom'):
         nodes = nx.get_node_attributes(self.network, 'node')
@@ -411,7 +400,7 @@ class PHDFilterNetwork:
                 neighbor_estimate = estimate
                 neighbor_weight = neighbor_weights[neighbor_id]
                 weighted_estimate += neighbor_weight * neighbor_estimate
-            # TODO: is ceil the right way to go?
+
             if np.floor(weighted_estimate) > len(nodes[node_id].targets):
                 c = len(nodes[node_id].targets)
             else:
@@ -428,11 +417,15 @@ class PHDFilterNetwork:
         self.get_neighbors_comps()
         self.get_comps_to_fuse()
 
+        new_comps = {}
+
         for node_id in list(self.network.nodes()):
             if how == 'geom':
-                self.geometric_fusion(node_id)
+                fused_comps = self.geometric_fusion(node_id)
             else:
-                self.arithmetic_fusion(node_id)
+                fused_comps = self.arithmetic_fusion(node_id)
+            new_comps[node_id] = fused_comps
+        return new_comps
 
     def rescale_component_weights(self):
         nodes = nx.get_node_attributes(self.network, 'node')
@@ -441,7 +434,12 @@ class PHDFilterNetwork:
             old_estimate = np.nansum([t.weight
                                       for t in nodes[node_id].targets])
             new_estimate = self.cardinality[node_id]
-            rescaler = new_estimate / old_estimate
+
+            if old_estimate == 0:
+                rescaler = 1
+            else:
+                rescaler = new_estimate / old_estimate
+
             targets = nodes[node_id].targets
             for t in targets:
                 t.weight = rescaler * t.weight
@@ -628,6 +626,11 @@ class PHDFilterNetwork:
                 sum_alpha_weighted_states = np.sum(fuse_alpha_weighted_states,
                                                    0)
                 sum_alphas = np.sum(fuse_alphas)
+
+                if sum_alphas == 0:
+                    new_states.append(sum_alpha_weighted_states)
+                    new_alphas.append(sum_alphas)
+                    continue
 
                 new_states.append(sum_alpha_weighted_states / sum_alphas)
                 new_alphas.append(sum_alphas)
@@ -934,8 +937,73 @@ class PHDFilterNetwork:
             squared_error += (card - N) ** 2
             sum_card += card
 
+        if N == 0 and sum_card == 0:
+            return 0
+
+        if N == 0 or sum_card == 0:
+            return squared_error
+
         return squared_error / (N * sum_card)
 
+    """
+    Static Methods
+    """
+
+    @staticmethod
+    def calcK(comps, weights):
+        # Omega and q
+        covs_weighted = []
+        states_weighted = []
+        for j in range(len(comps)):
+            w = weights[j]
+            inv_cov = np.linalg.inv(comps[j].state_cov)
+            x = comps[j].state
+            covs_weighted.append(w * inv_cov)
+            states_weighted.append(w * np.dot(inv_cov, x))
+        omega = np.sum(covs_weighted, 0)
+        q = np.sum(states_weighted, 0)
+
+        d = comps[0].state.shape[0]
+
+        # Kappa 1:n
+        firstterm_1n = len(comps) * d * np.log(2 * np.pi)
+        secondterm_1n = 0  # Filled in later
+        thirdterm_1n = 0  # Filled in later
+
+        # Kappa n
+        firstterm_n = d * np.log(2 * np.pi)
+        secondterm_n = 0  # Filled in later
+        thirdterm_n = np.dot(q.T, np.dot(np.linalg.inv(omega), q))
+
+        for i in range(len(comps)):
+            weight = weights[i]
+            state = comps[i].state
+            cov = comps[i].state_cov
+
+            secondterm_1n += np.log(np.linalg.det(weight * np.linalg.inv(cov)))
+            thirdterm_1n += weight * np.dot(state.T, np.dot(np.linalg.inv(cov),
+                                                            state))
+
+            secondterm_n += np.linalg.det(weight * np.linalg.inv(cov))
+
+        kappa_1n = -0.5 * (firstterm_1n - secondterm_1n + thirdterm_1n)
+        kappa_n = -0.5 * (firstterm_n - np.log(secondterm_n) + thirdterm_n)
+
+        K = np.exp(kappa_1n[0][0] - kappa_n[0][0])
+        return K
+
+    @staticmethod
+    @njit
+    def rescaler(cov, weight):
+        numer = np.linalg.det(2 * np.pi * np.linalg.inv(cov / weight))
+        denom = np.linalg.det(2 * np.pi * cov) ** weight
+        return (numer / denom) ** 0.5
+
+    @staticmethod
+    def get_mahalanobis(target1, target2):
+        d = mahalanobis(target1.state, target2.state,
+                        np.linalg.inv(target1.state_cov))
+        return d
 
     """
     Saving Data
@@ -1008,63 +1076,3 @@ class PHDFilterNetwork:
         for t, a in self.adjacencies.items():
             np.savetxt(path + '/{t}.csv'.format(t=t),
                        a, delimiter=',')
-
-    """
-    Static Methods
-    """
-
-    @staticmethod
-    def calcK(comps, weights):
-        # Omega and q
-        covs_weighted = []
-        states_weighted = []
-        for j in range(len(comps)):
-            w = weights[j]
-            inv_cov = np.linalg.inv(comps[j].state_cov)
-            x = comps[j].state
-            covs_weighted.append(w * inv_cov)
-            states_weighted.append(w * np.dot(inv_cov, x))
-        omega = np.sum(covs_weighted, 0)
-        q = np.sum(states_weighted, 0)
-
-        d = comps[0].state.shape[0]
-
-        # Kappa 1:n
-        firstterm_1n = len(comps) * d * np.log(2 * np.pi)
-        secondterm_1n = 0  # Fill in later
-        thirdterm_1n = 0  # Fill in later
-
-        # Kappa n
-        firstterm_n = d * np.log(2 * np.pi)
-        secondterm_n = 0  # Fill in later
-        thirdterm_n = np.dot(q.T, np.dot(np.linalg.inv(omega), q))
-
-        for i in range(len(comps)):
-            weight = weights[i]
-            state = comps[i].state
-            cov = comps[i].state_cov
-
-            secondterm_1n += np.log(np.linalg.det(weight * np.linalg.inv(cov)))
-            thirdterm_1n += weight * np.dot(state.T, np.dot(np.linalg.inv(cov),
-                                                            state))
-
-            secondterm_n += np.linalg.det(weight * np.linalg.inv(cov))
-
-        kappa_1n = -0.5 * (firstterm_1n - secondterm_1n + thirdterm_1n)
-        kappa_n = -0.5 * (firstterm_n - np.log(secondterm_n) + thirdterm_n)
-
-        K = np.exp(kappa_1n[0][0] - kappa_n[0][0])
-        return K
-
-    @staticmethod
-    @njit
-    def rescaler(cov, weight):
-        numer = np.linalg.det(2 * np.pi * np.linalg.inv(cov / weight))
-        denom = np.linalg.det(2 * np.pi * cov) ** weight
-        return (numer / denom) ** 0.5
-
-    @staticmethod
-    def get_mahalanobis(target1, target2):
-        d = mahalanobis(target1.state, target2.state,
-                        np.linalg.inv(target1.state_cov))
-        return d
