@@ -42,7 +42,7 @@ x_start = -50 + (100.0 / (num_nodes + 1))  # init x coord of first node
 pos_start = np.array([x_start, 0, 20])  # init x coord for all nodes
 pos_init_dist = np.floor(100.0 / (num_nodes + 1))  # init x dist between nodes
 fov = 20  # radius of FOV
-noise_mult = [3, 3, 3, 3, 3]  # multiplier for added noise at each failure. length should equal the number of trials
+noise_mult = [5, 5, 5]  # multiplier for added noise at each failure. length should equal the number of trials
 
 
 
@@ -174,8 +174,6 @@ for n in range(len(noise_mult)):
 
             if not os.path.exists(trial_name):
                 os.makedirs(trial_name)
-                os.makedirs(trial_name + '/3ds')
-                os.makedirs(trial_name + '/overhead')
                 os.makedirs(trial_name + '/topologies')
             filternetwork.save_metrics(trial_name)
             filternetwork.save_estimates(trial_name)

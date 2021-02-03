@@ -79,12 +79,13 @@ def agent_opt(adj_mat, current_weights, covariance_data, ne=1,
                 if adj_mat[i, j] == 1:
                     problem.add_constraint(PI[i, j] == 1.0)
 
-    problem.add_constraint(
-        abs(PI - adj_mat) ** 2 <= edge_mod_limit)
+    # problem.add_constraint(
+    #     abs(PI - adj_mat) ** 2 <= edge_mod_limit)
 
     try:
         problem.solve(verbose=0, solver='mosek')
         # problem_status = problem.status
+        # print(problem_status)
 
         new_config = np.zeros(adj_mat.shape)
         new_weights = {}
@@ -108,7 +109,9 @@ def agent_opt(adj_mat, current_weights, covariance_data, ne=1,
                     new_weights[j][i] = nw
 
         return problem, problem.obj_value(), new_config, new_weights
-    except:
+    except Exception as e:
+        print('solve error')
+        print(e)
         return problem, 'infeasible', adj_mat, current_weights
 
 
@@ -231,12 +234,13 @@ def team_opt(adj_mat, current_weights, covariance_matrices, how='geom', ne=1,
                 if adj_mat[i, j] == 1:
                     problem.add_constraint(PI[i, j] == 1.0)
 
-    problem.add_constraint(
-        abs(PI - adj_mat) ** 2 <= edge_mod_limit)
+    # problem.add_constraint(
+    #     abs(PI - adj_mat) ** 2 <= edge_mod_limit)
 
     try:
         problem.solve(verbose=0, solver='mosek')
         # problem_status = problem.status
+        # print(problem_status)
 
         new_config = np.zeros(adj_mat.shape)
         new_weights = {}
@@ -260,5 +264,7 @@ def team_opt(adj_mat, current_weights, covariance_matrices, how='geom', ne=1,
                     new_weights[j][i] = nw
 
         return problem, problem.obj_value(), new_config, new_weights
-    except:
+    except Exception as e:
+        print('solve error')
+        print(e)
         return problem, 'infeasible', adj_mat, current_weights

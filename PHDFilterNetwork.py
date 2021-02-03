@@ -236,10 +236,10 @@ class PHDFilterNetwork:
             det_c = np.linalg.det(c)
             covariance_data.append((1/min_cardinality) * det_c)
 
-        # new_config, new_weights = agent_opt_iter(self.adjacency_matrix(),
-        #                                          current_weights,
-        #                                          covariance_data,
-        #                                          failed_node=failed_node)
+        # _, _, new_config, new_weights = agent_opt(self.adjacency_matrix(),
+        #                                     current_weights,
+        #                                     covariance_data,
+        #                                     failed_node=failed_node)
 
         # GET POSSIBLE EDGES
         possible_edge_decisions, current_edge_decisions = \
@@ -265,11 +265,10 @@ class PHDFilterNetwork:
 
         current_weights = nx.get_node_attributes(self.network, 'weights')
 
-        # new_config, new_weights = team_opt_iter(self.adjacency_matrix(),
-        #                                         current_weights,
-        #                                         cov_data,
-        #                                         failed_node,
-        #                                         how=how)
+        # _, _, new_config, new_weights = team_opt(self.adjacency_matrix(),
+        #                                          current_weights,
+        #                                          cov_data,
+        #                                          how=how)
 
         # GET POSSIBLE EDGES
         possible_edge_decisions, current_edge_decisions = \
