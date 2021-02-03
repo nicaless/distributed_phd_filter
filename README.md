@@ -23,8 +23,8 @@ six==1.15.0
 
 ## Simple Usage
 
-To run a simulation trial for 5 robot trackers execute:
+To run a simulation trial for 3 robot trackers execute:
 
 ````
-python run_sim.py 5 [SAVE FOLDER]
+python run_sim.py 3 [SAVE FOLDER]
 ````
