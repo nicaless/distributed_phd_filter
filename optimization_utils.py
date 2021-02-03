@@ -79,8 +79,8 @@ def agent_opt(adj_mat, current_weights, covariance_data, ne=1,
                 if adj_mat[i, j] == 1:
                     problem.add_constraint(PI[i, j] == 1.0)
 
-    # problem.add_constraint(
-    #     abs(PI - adj_mat) ** 2 <= edge_mod_limit)
+    problem.add_constraint(
+        abs(PI - adj_mat) ** 2 <= edge_mod_limit)
 
     try:
         problem.solve(verbose=0, solver='mosek')
@@ -107,6 +107,8 @@ def agent_opt(adj_mat, current_weights, covariance_data, ne=1,
                         nw = 0.1
                     new_weights[i][j] = nw
                     new_weights[j][i] = nw
+
+        new_weights = normalize_weights(new_weights)
 
         return problem, problem.obj_value(), new_config, new_weights
     except Exception as e:
@@ -234,8 +236,8 @@ def team_opt(adj_mat, current_weights, covariance_matrices, how='geom', ne=1,
                 if adj_mat[i, j] == 1:
                     problem.add_constraint(PI[i, j] == 1.0)
 
-    # problem.add_constraint(
-    #     abs(PI - adj_mat) ** 2 <= edge_mod_limit)
+    problem.add_constraint(
+        abs(PI - adj_mat) ** 2 <= edge_mod_limit)
 
     try:
         problem.solve(verbose=0, solver='mosek')
@@ -263,8 +265,24 @@ def team_opt(adj_mat, current_weights, covariance_matrices, how='geom', ne=1,
                     new_weights[i][j] = nw
                     new_weights[j][i] = nw
 
+        new_weights = normalize_weights(new_weights)
+
         return problem, problem.obj_value(), new_config, new_weights
     except Exception as e:
         print('solve error')
         print(e)
         return problem, 'infeasible', adj_mat, current_weights
+
+
+def normalize_weights(weights):
+    n = len(weights.keys())
+
+    for i in range(n):
+        total = 0
+        node_weights = weights[i]
+        for node, weight in node_weights.items():
+            total += weight
+        for node, weight in node_weights.items():
+            weights[i][node] = weight / total
+
+    return weights

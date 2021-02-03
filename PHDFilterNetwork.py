@@ -249,13 +249,13 @@ class PHDFilterNetwork:
         root = BBTreeNode(possible_edge_decisions, current_edge_decisions,
                           self.adjacency_matrix(), current_weights,
                           covariance_data, failed_node=failed_node, opt='agent')
-        bestobj, bestnode, new_config, best_weights = root.bbsolve()
+        bestobj, bestnode, new_config, new_weights = root.bbsolve()
 
         G = nx.from_numpy_matrix(new_config)
         self.network = G
         nx.set_node_attributes(self.network, nodes, 'node')
 
-        new_weights = self.get_metro_weights()
+        # new_weights = self.get_metro_weights()
         nx.set_node_attributes(self.network, new_weights, 'weights')
 
     def do_team_opt(self, failed_node, how='geom'):
@@ -278,14 +278,13 @@ class PHDFilterNetwork:
         root = BBTreeNode(possible_edge_decisions, current_edge_decisions,
                           self.adjacency_matrix(), current_weights,
                           cov_data, opt='team')
-        bestobj, bestnode, new_config, best_weights = \
+        bestobj, bestnode, new_config, new_weights = \
             root.bbsolve(fuse_method=how)
 
         G = nx.from_numpy_matrix(new_config)
         self.network = G
         nx.set_node_attributes(self.network, nodes, 'node')
-        #
-        new_weights = self.get_metro_weights()
+        # new_weights = self.get_metro_weights()
         nx.set_node_attributes(self.network, new_weights, 'weights')
 
     def do_greedy_opt(self, failed_node, how='geom'):
