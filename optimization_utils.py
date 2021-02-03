@@ -79,9 +79,10 @@ def agent_opt(adj_mat, current_weights, covariance_data, ne=1,
                 if adj_mat[i, j] == 1:
                     problem.add_constraint(PI[i, j] == 1.0)
 
+
     problem.add_constraint(
         abs(PI - adj_mat) ** 2 <= edge_mod_limit)
-
+    
     try:
         problem.solve(verbose=0, solver='mosek')
         # problem_status = problem.status
@@ -235,6 +236,7 @@ def team_opt(adj_mat, current_weights, covariance_matrices, how='geom', ne=1,
             for j in range(n):
                 if adj_mat[i, j] == 1:
                     problem.add_constraint(PI[i, j] == 1.0)
+
 
     problem.add_constraint(
         abs(PI - adj_mat) ** 2 <= edge_mod_limit)
