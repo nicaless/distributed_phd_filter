@@ -1,11 +1,13 @@
 from copy import deepcopy
-import math
-from numba import jit, njit, cuda
 import numpy as np
 from operator import attrgetter
 from scipy.spatial.distance import mahalanobis
 
 from target import Target
+
+"""
+Some code borrowed from https://github.com/danstowell/gmphd/blob/master/gmphd.py
+"""
 
 
 class PHDFilterNode:
@@ -16,7 +18,6 @@ class PHDFilterNode:
                  merge_thresh=1,
                  max_comp=20,
                  clutter_rate=5,
-                 # clutter_rate=0,
                  position=np.array([0, 0, 0]),
                  region=[(-50, 50), (-50, 50)]
                  ):
@@ -56,7 +57,7 @@ class PHDFilterNode:
         # reweighted results
         self.reweighted_targets = []
 
-        # TODO: consensus targets (used in fusion step)
+        # consensus results
         self.consensus_targets = []
 
         # TRACKERS
@@ -101,9 +102,6 @@ class PHDFilterNode:
 
         self.predicted_pos = predicted_pos
         self.predicted_targets = all_targets
-
-    def add_clutter(self):
-        pass
 
     def update(self, measurements):
         self.measurements = measurements
@@ -161,9 +159,6 @@ class PHDFilterNode:
         self.updated_targets = newgmm
 
     def check_measure_oob(self, m):
-        # # TODO: investigate why there have nan states/measurements anyway
-        # any_nan = np.isnan(m).any()
-
         x = m[0][0]
         y = m[1][0]
 
@@ -179,9 +174,6 @@ class PHDFilterNode:
         return d
 
     def prune(self):
-        # print(max([comp.weight for comp in self.updated_targets]))
-        # print(min([comp.weight for comp in self.updated_targets]))
-        # print(np.unique([comp.weight for comp in self.updated_targets]))
         prunedgmm = list(filter(lambda comp: comp.weight > self.prune_thresh,
                                 self.updated_targets))
         self.pruned_targets = prunedgmm
@@ -280,15 +272,8 @@ class PHDFilterNode:
                                            for t in self.targets]
             self.consensus_target_covs[i] = [t.state_cov for t in self.targets]
 
-# @njit
+
 def dmvnorm(state, cov, obs):
-    """
-    Evaluate a multivariate normal, given a state (vector) and covariance (matrix) and a position x (vector) at which to evaluate"
-    :param state:
-    :param cov:
-    :param obs:
-    :return:
-    """
     k = state.shape[0]
     part1 = (2.0 * np.pi) ** (-k * 0.5)
     part2 = np.power(np.linalg.det(cov), -0.5)

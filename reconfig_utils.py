@@ -1,6 +1,5 @@
 from copy import deepcopy
 import numpy as np
-import platform
 
 
 def generate_coords(new_config, current_coords, fov, target_estimate,
@@ -20,15 +19,13 @@ def generate_coords(new_config, current_coords, fov, target_estimate,
     :param safe_dist: safe distances between nodes
     :param connect_dist: connect distances between nodes
     :param steps: simulated annealing steps
-    :return:
+    :param lax: whether or not to return a configuration even if some
+            constraints are still violated
+
+    :return: dictionary of new coordinates
     """
 
     invalid_iters_limit = 3
-    # if platform.system() == 'Linux':
-    #     invalid_iters_limit = 10
-    #     steps = 10000
-    # else:
-    #     invalid_iters_limit = 5
 
     # Simulated Annealing
     H = np.logspace(1, 3, steps)
@@ -111,7 +108,6 @@ def energyCoverage(config, propose_coords, fov, target_estimate,
     sum_box = 0
     sum_safe = 0
     sum_conn = 0
-    sum_focus = 0
     bbox = bbox
     sum_x = 0
     sum_y = 0
@@ -142,7 +138,6 @@ def energyCoverage(config, propose_coords, fov, target_estimate,
             p = ((overlap ** 2) * np.pi) / 2
             coverage_penalties = coverage_penalties + p
 
-    # TODO: still congregating around the center, maybe double check with MATLAB code?
     avg_x = sum_x / float(n)
     avg_y = sum_y / float(n)
     node_pos = np.array([[avg_x], [avg_y]])
@@ -161,7 +156,7 @@ def isValidConfig(config, coords, safe_dist, connect_dist, bbox):
     :param safe_dist: safe distances between nodes
     :param connect_dist: connect distances between nodes
     :param bbox: region bounding box
-    :return:
+    :return: whether or not configuration satisfies all constraints
     """
     n = len(coords)
 

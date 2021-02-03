@@ -17,10 +17,10 @@ import time
 Params
 """
 parser = argparse.ArgumentParser()
-parser.add_argument('num', type=int, default=3)
-parser.add_argument('run_name', default='3_nodes')
-parser.add_argument('seed', type=int, default=42)
-parser.add_argument('--single_node_fail', help='Only one node will experience failure', action='store_true')
+parser.add_argument('num', help='number of nodes', type=int, default=3)
+parser.add_argument('run_name', help='folder to save results', default='3_nodes')
+parser.add_argument('seed', help='random seed', type=int, default=42)
+parser.add_argument('--single_node_fail', help='Only one node will experience failures', action='store_true')
 args = parser.parse_args()
 
 num_nodes = args.num
@@ -37,14 +37,12 @@ if single_node_fail:
 else:
     fails_before_saturation = num_nodes * (num_nodes - 1) / 2 - (num_nodes - 1)
 fail_freq = int(np.ceil(total_time_steps / fails_before_saturation))
-# fail_int = [5, 10, 15, 20, 25, 30, 35, 40, 45]  # time steps at which failure occurs
 fail_int = list(range(1, total_time_steps, fail_freq))  # time steps at which failure occurs (no failure on first time step)
 x_start = -50 + (100.0 / (num_nodes + 1))  # init x coord of first node
 pos_start = np.array([x_start, 0, 20])  # init x coord for all nodes
 pos_init_dist = np.floor(100.0 / (num_nodes + 1))  # init x dist between nodes
 fov = 20  # radius of FOV
-noise_mult = [3, 3, 3, 3, 3]  # multiplier for added noise at each failure
-# noise_mult = [3]  # multiplier for added noise at each failure
+noise_mult = [3, 3, 3, 3, 3]  # multiplier for added noise at each failure. length should equal the number of trials
 
 
 
@@ -125,18 +123,6 @@ for n in range(len(noise_mult)):
     noise = noise_mult[n]
     for how in ['arith', 'geom']:
         for opt in ['base', 'agent', 'team', 'greedy', 'random']:
-            # if opt == 'team':
-            #     mydir = 'misdp_data/inverse_covariance_matrices'
-            #     # Clear Out Old MISDP Data
-            #     filelist = [f for f in os.listdir(mydir) if f.endswith(".csv")]
-            #     for f in filelist:
-            #         os.remove(os.path.join(mydir, f))
-            #     if os.path.exists('misdp_data/adj_mat.csv'):
-            #         os.remove('misdp_data/adj_mat.csv')
-            #     if os.path.exists('misdp_data/new_A.csv'):
-            #         os.remove('misdp_data/new_A.csv')
-            #     if os.path.exists('misdp_data/new_weights.csv'):
-            #         os.remove('misdp_data/new_weights.csv')
 
             trial_name = run_name + '/{n}_{h}_{o}'.format(n=n, h=how, o=opt)
             print(trial_name)
@@ -200,12 +186,6 @@ for n in range(len(noise_mult)):
             run_times_df = pd.DataFrame(run_times)
             run_times_df.to_csv(run_name + '/run_times.csv')
 
-
-expected_num_loops = len(noise_mult) * \
-                     len(['arith', 'geom']) * \
-                     len(['base', 'agent', 'greedy', 'team', 'random'])
-
-assert count_loops == expected_num_loops
 
 run_times_df = pd.DataFrame(run_times)
 run_times_df.to_csv(run_name + '/run_times.csv')
