@@ -114,6 +114,9 @@ class DKFNetwork:
             current_coords = {nid: n.position for nid, n in nodes.items()}
             fov = {nid: n.fov for nid, n in nodes.items()}
             Rs = {nid: n.R for nid, n in nodes.items()}
+            mean_target_x = np.mean([t.state[0][0] for t in nodes[0].targets])
+            mean_target_y = np.mean([t.state[0][0] for t in nodes[0].targets])
+            target_estimate = np.array([[mean_target_x], [mean_target_y]])
             # TODO: parametrize these
             H_default = np.logspace(1, 3, 1000)[0]
             k = -0.1
