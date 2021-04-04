@@ -1,13 +1,13 @@
 from copy import deepcopy
 import numpy as np
 import quadpy
-import platform
 
+SCHEME = quadpy.s2.get_good_scheme(6)
 
 def generate_coords(new_config, current_coords, fov, Rs,
                     bbox=np.array([(-50, 50), (-50, 50), (10, 100)]),
                     delta=10, safe_dist=10, connect_dist=25, k=-0.1, steps=1000,
-                    lax=True):
+                    lax=True, target_estimate=None):
     """
     Uses Simulated Annealing to generate new coordinates given new config
 
@@ -15,7 +15,6 @@ def generate_coords(new_config, current_coords, fov, Rs,
     :param current_coords: dictionary of nodes and positions
     :param fov: Dictionary of Field of View of nodes
     :param target_estimate: centroid of PHD
-
     :param bbox: region bounding box
     :param delta: delta is max movement
     :param safe_dist: safe distances between nodes
@@ -25,17 +24,13 @@ def generate_coords(new_config, current_coords, fov, Rs,
     """
 
     invalid_iters_limit = 3
-    # if platform.system() == 'Linux':
-    #     invalid_iters_limit = 10
-    #     steps = 10000
-    # else:
-    #     invalid_iters_limit = 5
 
     # Simulated Annealing
     H = np.logspace(1, 3, steps)
     temperature = np.logspace(1, -8, steps)
 
     new_coords = current_coords
+    current_valid_config = current_coords
     valid_config = False
     invalid_configs = 0
     while not valid_config:
@@ -56,8 +51,12 @@ def generate_coords(new_config, current_coords, fov, Rs,
                     new_coords = deepcopy(propose_coords)
             del propose_coords
 
-        valid_config = isValidConfig(new_config, new_coords,
-                                     safe_dist, connect_dist, bbox)
+            valid_config = isValidConfig(new_config, new_coords,
+                                         safe_dist, connect_dist, bbox)
+
+            if valid_config:
+                current_valid_config = new_coords
+
         if not valid_config:
             invalid_configs = invalid_configs + 1
         if invalid_configs > invalid_iters_limit:
@@ -65,7 +64,7 @@ def generate_coords(new_config, current_coords, fov, Rs,
             if lax:
                 return new_coords, propSQ
             else:
-                return False
+                return current_valid_config, propSQ
 
     return new_coords, propSQ
 
@@ -89,7 +88,8 @@ def propose(current_coords, delta):
 
 
 def energyCoverage(config, propose_coords, fov, Rs,
-                   H, k, safe_dist, connect_dist, bbox):
+                   H, k, safe_dist, connect_dist, bbox,
+                   existing_coords, target_estimate=None):
     """
     Get Energy, try to congregate around centroid of PHD
 
@@ -123,10 +123,23 @@ def energyCoverage(config, propose_coords, fov, Rs,
     sum_conn = 0
     bbox = bbox
 
+    sum_x = 0
+    sum_y = 0
+
+    coords_diff = 0
+
     n = len(propose_coords)
     for i in range(n):
         pos = propose_coords[i]
         sum_box_node = 0
+
+        sum_x += pos[0]
+        sum_y += pos[1]
+
+        prev_pos = existing_coords[i]
+        coords_diff += np.linalg.norm(np.array([[pos[0]], [pos[1]], [pos[2]]]) -
+                                      np.array([[prev_pos[0]], [prev_pos[1]], [prev_pos[2]]])
+                                      )
 
         for d in range(len(bbox)):
             sum_box_node = sum_box_node + (ph(pos[d] - bbox[d, 1], H) +
@@ -142,8 +155,20 @@ def energyCoverage(config, propose_coords, fov, Rs,
             else:
                 sum_conn = sum_conn + (ph(connect_dist - d, H))
 
+    avg_x = sum_x / float(n)
+    avg_y = sum_y / float(n)
+    node_pos = np.array([[avg_x], [avg_y]])
+    if target_estimate is not None:
+        dist_from_target = np.linalg.norm(node_pos - target_estimate)
+        sum_focus = 1.5 * ph(dist_from_target, H)
+    else:
+        sum_focus = 0
+
+    sum_diff = 0.5 * ph(coords_diff, H)
+
     energy = (k * total_coverage) + coverage_penalties + \
-             sum_box + sum_safe + sum_conn
+             sum_box + 1.5*sum_safe + sum_conn + sum_focus + sum_diff
+
     surveillance_quality = total_coverage - coverage_penalties
     return energy, surveillance_quality
 
@@ -199,8 +224,7 @@ def ph(x, H):
     if x < 0:
         return 0
     else:
-        return 999
-        # return np.exp(H * x)
+        return np.exp(H * x)
 
 
 def Hc(drone_pos, fov_radius, focal_length=0.04, sigma=0.3, R=30, kappa=0.5):
@@ -220,7 +244,8 @@ def Hc(drone_pos, fov_radius, focal_length=0.04, sigma=0.3, R=30, kappa=0.5):
     c2 = 2 * (sigma ** 2)
 
     # scheme = quadpy.disk.lether(6)
-    scheme = quadpy.s2.get_good_scheme(6)
+    # scheme = quadpy.s2.get_good_scheme(6)
+    scheme = SCHEME
     val = scheme.integrate(lambda p: (fpers(p[0], a1, b1, c1) *
                                       fres(p[0], a2, b2, c2)),
                            [x, y], r
@@ -266,7 +291,8 @@ def Ho(drone1_pos, drone2_pos, fov1_radius, fov2_radius, focal_length=0.04, sigm
     c4 = 2 * (sigma ** 2)
 
     # scheme = quadpy.disk.lether(6)
-    scheme = quadpy.s2.get_good_scheme(6)
+    # scheme = quadpy.s2.get_good_scheme(6)
+    scheme = SCHEME
     val1 = scheme.integrate(lambda x: (fpers(x[0], a1, b1, c1) *
                                        fres(x[0], a2, b2, c2)),
                            [mid_x, mid_y], overlap

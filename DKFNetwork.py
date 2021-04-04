@@ -83,17 +83,15 @@ class DKFNetwork:
         """
         Do Optimization and Formation Synthesis
         """
-        if failure and not base:
-            if opt == 'agent' and not missed_obs:
+        if (failure or missed_obs) and not base:
+            if opt == 'agent' and failure:
                 self.do_agent_opt(fail_node)
-            elif opt == 'team' and not missed_obs:
+            elif opt == 'team' and failure:
                 self.do_team_opt(fail_node)
-            elif opt == 'greedy' and not missed_obs:
+            elif opt == 'greedy' and failure:
                 self.do_greedy_opt(fail_node)
-            # Random strategy
             else:
-                self.do_greedy_opt(fail_node)
-                # self.do_random_opt(fail_node)
+                pass
 
             # Formation Synthesis
             current_coords = {nid: n.position for nid, n in nodes.items()}
