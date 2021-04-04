@@ -120,7 +120,9 @@ class DKFNetwork:
             safe_dist = 10
             connect_dist = 25
             _, sq = energyCoverage(self.adjacency_matrix(), current_coords, fov, Rs,
-                                    H_default, k, safe_dist, connect_dist, DEFAULT_BBOX)
+                                    H_default, k, safe_dist, connect_dist, DEFAULT_BBOX,
+                                   current_coords,
+                                   target_estimate=target_estimate)
             self.surveillance_quality[i] = sq
 
         """
