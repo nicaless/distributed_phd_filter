@@ -98,8 +98,12 @@ class DKFNetwork:
             fov = {nid: n.fov for nid, n in nodes.items()}
             Rs = {nid: n.R for nid, n in nodes.items()}
 
+            mean_target_x = np.mean([t.state[0][0] for t in nodes[0].targets])
+            mean_target_y = np.mean([t.state[0][0] for t in nodes[0].targets])
+            target_estimate = np.array([[mean_target_x], [mean_target_y]])
             new_coords, sq = generate_coords(self.adjacency_matrix(),
-                                             current_coords, fov, Rs)
+                                             current_coords, fov, Rs,
+                                             target_estimate=target_estimate)
             self.surveillance_quality[i] = sq
             if new_coords:
                 for id, n in nodes.items():

@@ -38,10 +38,14 @@ def generate_coords(new_config, current_coords, fov, Rs,
             T = temperature[i]
             propose_coords = propose(new_coords, delta)
             current_E, currSQ = energyCoverage(new_config, new_coords, fov, Rs,
-                                       H[i], k, safe_dist, connect_dist, bbox)
+                                               H[i], k, safe_dist, connect_dist,
+                                               bbox, current_coords,
+                                               target_estimate=target_estimate)
             propose_E, propSQ = energyCoverage(new_config, propose_coords, fov,
                                                Rs, H[i], k, safe_dist,
-                                               connect_dist, bbox)
+                                               connect_dist, bbox, current_coords,
+                                               target_estimate=target_estimate
+                                               )
             if propose_E < current_E:
                 new_coords = deepcopy(propose_coords)
             else:
