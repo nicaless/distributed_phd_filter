@@ -193,13 +193,13 @@ def isValidConfig(config, coords, safe_dist, connect_dist, bbox):
         # Check Position is within BBox
         x, y, z = coords[i]
         if not (bbox[0, 0] <= x <= bbox[0, 1]):
-            print("x pos not in bbox")
+            # print("x pos not in bbox")
             return False
         if not (bbox[1, 0] <= y <= bbox[1, 1]):
-            print("y pos not in bbox")
+            # print("y pos not in bbox")
             return False
         if not (bbox[2, 0] <= z <= bbox[2, 1]):
-            print("z pos not in bbox")
+            # print("z pos not in bbox")
             return False
 
         for j in range(i + 1, n):
@@ -208,15 +208,15 @@ def isValidConfig(config, coords, safe_dist, connect_dist, bbox):
             # If Neighbors, check if between safe_dist and connect_dist
             if config[i, j] > 0:
                 if not (safe_dist <= d <= connect_dist):
-                    print(
-                        'too close or too far from connection, {i}-{j}'.format(
-                            i=i, j=j))
+                    # print(
+                    #     'too close or too far from connection, {i}-{j}'.format(
+                    #         i=i, j=j))
                     return False
             # If not, check if greater than connect_dist
             else:
                 if not (connect_dist <= d):
-                    print(
-                        'too close to neighbor, {i}-{j}'.format(i=i, j=j))
+                    # print(
+                    #     'too close to neighbor, {i}-{j}'.format(i=i, j=j))
                     return False
     return True
 

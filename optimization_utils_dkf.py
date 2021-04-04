@@ -946,37 +946,47 @@ class BBTreeNode():
                     bestnode = node
                     bestPI = PI
                     bestA = A
+                    if nodecount == 1:
+                        new_nodes = self.do_branching(node)
+                        for new_node in new_nodes:
+                            # using counter to avoid possible comparisons between nodes. It tie breaks
+                            heappush(heap, (obj, next(counter), new_node))
 
                 # otherwise, we're unsure if this branch holds promise.
                 # Maybe it can't actually achieve this lower bound. So branch into it
                 else:
                     print("Branching")
-                    changed_edges = 0
-                    next_edge = None
-                    for e, d in node.edge_decisions.items():
-                        if d is None:
-                            next_edge = e
-                            break
-                        if node.edge_decisions[e] != self.curr_edge_decisions[e]:
-                            print("edge changed in this node", e)
-                            print("previously", self.curr_edge_decisions[e])
-                            print("now", node.edge_decisions[e])
-                            changed_edges += 1
-                        elif node.edge_decisions[e] == self.curr_edge_decisions[e]:
-                            continue
-                    if changed_edges >= self.ne:
-                        continue
-
-                    if next_edge is None:
-                        continue
-
-                    print("branch on edge:", next_edge)
-                    new_nodes = node.branch(next_edge)
+                    new_nodes = self.do_branching(node)
                     for new_node in new_nodes:
                         # using counter to avoid possible comparisons between nodes. It tie breaks
                         heappush(heap, (obj, next(counter), new_node))
         print("Nodes searched: ", nodecount)
         return bestres, bestnode, bestA, bestPI
+
+    def do_branching(self, node):
+        # print("Branching")
+        changed_edges = 0
+        next_edge = None
+        for e, d in node.edge_decisions.items():
+            if d is None:
+                next_edge = e
+                break
+            if node.edge_decisions[e] != self.curr_edge_decisions[e]:
+                # print("edge changed in this node", e)
+                # print("previously", self.curr_edge_decisions[e])
+                # print("now", node.edge_decisions[e])
+                changed_edges += 1
+            elif node.edge_decisions[e] == self.curr_edge_decisions[e]:
+                continue
+        if changed_edges >= self.ne:
+            return []
+
+        if next_edge is None:
+            return []
+
+        # print("branch on edge:", next_edge)
+        new_nodes = node.branch(next_edge)
+        return new_nodes
 
 
 def team_opt_bnb(adj_mat, current_weights, covariance_matrices, omegas, failed_node, ne=1):
