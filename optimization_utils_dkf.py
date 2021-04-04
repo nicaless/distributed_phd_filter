@@ -14,6 +14,8 @@ counter = itertools.count()
 
 
 def magnitude(x):
+    if x == 0:
+        return 0
     return int(math.log10(abs(x)))
 
 
@@ -937,7 +939,7 @@ class BBTreeNode():
             if problem_status == 'solver error':
                 continue
             if problem_status in ['integer optimal', 'optimal']:
-                if (obj > bestres - 1e-3) and (nodecount > 1):  # even the relaxed problem sucks. forget about this branch then
+                if (obj > bestres) and (nodecount > 1):  # even the relaxed problem sucks. forget about this branch then
                     print("Relaxed Problem Stinks. Killing this branch.")
                     continue
                 elif self.check_integrals(PI):  #if a valid solution then this is the new best
