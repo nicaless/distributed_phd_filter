@@ -1,4 +1,4 @@
-cvxopt==1.2.5
+cvxopt==1.2.7
 decorator==4.4.2
 llvmlite==0.35.0
 Mosek==9.2.36
